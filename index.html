@@ -52,9 +52,14 @@
                     return join(Events({from_date: '2016-05-10', to_date: '2016-05-10', 
                                         event_selectors:[{event: "API Request"}]}), 
                                 People())
-                        .map(function (tup){ return [tup.event.properties.elapsed, 
-                        tup.user.people_tally, 
-                        tup.event.properties.type]; });
+                        .map(function (tup){ 
+                          if (tup.event == undefined) {
+                            return [0,0,'none']
+                          }
+                          return [tup.event.properties.elapsed, 
+                          tup.user.people_tally, 
+                          tup.event.properties.type]; 
+                        });
                 }
             ).done(
                 function(results) {
@@ -63,9 +68,8 @@
                   results = results.slice(0,10000);
                   console.log(results);
 
-                  //x.domain(d3.extent(results, function(d) {return d[0];})).nice();
+                  x.domain(d3.extent(results, function(d) {return d[0];})).nice();
                   y.domain(d3.extent(results, function(d) {return d[1];})).nice();
-                  x.domain([0,30000]);
                   
                   svg.append("g")
                       .attr("class", "x axis")
