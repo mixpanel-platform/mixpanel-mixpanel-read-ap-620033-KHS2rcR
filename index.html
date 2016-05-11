@@ -58,7 +58,7 @@
                             return [0,0,'none']
                           }
                           return [tup.event.properties.elapsed, 
-                          tup.user.properties.people_tally, 
+                          tup.user.properties.events_tally, 
                           tup.event.properties.endpoint]; 
                         });
                 }
@@ -92,7 +92,7 @@
                       .attr("y", 6)
                       .attr("dy", ".71em")
                       .style("text-anchor", "end")
-                      .text("days");
+                      .text("events");
                     
                   svg.selectAll(".dot")
                       .data(results)
