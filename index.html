@@ -53,11 +53,11 @@
                                         event_selectors:[{event: "API request"}]}), 
                                 People())
                         .map(function (tup){ 
-                          if (tup.event == undefined) {
+                          if (tup.event == undefined || tup.user == undefined) {
                             return [0,0,'none']
                           }
                           return [tup.event.properties.elapsed, 
-                          tup.user.people_tally, 
+                          tup.user.properties.people_tally, 
                           tup.event.properties.type]; 
                         });
                 }
