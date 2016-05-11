@@ -52,14 +52,19 @@
                     return join(Events({from_date: '2016-05-08', to_date: '2016-05-08', 
                                         event_selectors:[{event: "API request"}]}), 
                                 People())
-                        .filter(function(tup) { return Math.random() < 0.05;})
+                        .filter(function(tup) { 
+                          return tup.event != undefined && 
+                            tup.user != undefined && 
+                            tup.user.properties.events_tally >= 1e6;
+                        })
                         .map(function (tup){ 
                           if (tup.event == undefined || tup.user == undefined) {
                             return [0,0,'none']
                           }
                           return [tup.event.properties.elapsed, 
-                          tup.user.properties.events_tally, 
-                          tup.event.properties.endpoint]; 
+                            tup.user.properties.events_tally, 
+                            tup.event.properties.endpoint
+                            ]; 
                         });
                 }
             ).done(
