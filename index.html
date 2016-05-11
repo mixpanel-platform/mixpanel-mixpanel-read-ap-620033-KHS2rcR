@@ -50,7 +50,7 @@
             MP.api.jql(
                 function main() {
                     return join(Events({from_date: '2016-05-10', to_date: '2016-05-10', 
-                                        event_selectors:[{event: "API Request"}]}), 
+                                        event_selectors:[{event: "API request"}]}), 
                                 People())
                         .map(function (tup){ 
                           if (tup.event == undefined) {
