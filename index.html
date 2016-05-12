@@ -46,7 +46,7 @@
             .attr("height", height + margin.top + margin.bottom)
             .append("g")
             .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
-
+            
             MP.api.jql(
                 function main() {
                     return join(Events({from_date: '2016-05-08', to_date: '2016-05-08', 
@@ -55,7 +55,7 @@
                         .filter(function(tup) { 
                           return tup.event != undefined && 
                             tup.user != undefined && 
-                            tup.user.properties.events_tally >= 1e6;
+                            tup.user.properties.rank <= 100;
                         })
                         .map(function (tup){ 
                           if (tup.event == undefined || tup.user == undefined) {
@@ -71,9 +71,6 @@
                 function(results) {
                   //results = results.map(function(r) {return {'x':r.value, 'y':r.value, 't':r.key[0]};});
                   
-                  results = results.slice(0,10000);
-                  console.log(results);
-
                   x.domain(d3.extent(results, function(d) {return d[0];})).nice();
                   y.domain(d3.extent(results, function(d) {return d[1];})).nice();
                   
@@ -97,7 +94,7 @@
                       .attr("y", 6)
                       .attr("dy", ".71em")
                       .style("text-anchor", "end")
-                      .text("events");
+                      .text("event tally");
                     
                   svg.selectAll(".dot")
                       .data(results)
