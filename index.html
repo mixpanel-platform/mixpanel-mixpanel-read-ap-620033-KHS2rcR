@@ -53,10 +53,10 @@
                                         event_selectors:[{event: "API request"}]}), 
                                 People())
                         .filter(function(tup) { 
-                          return tup.event != undefined && 
-                            tup.user != undefined && 
-                            tup.user.properties.rank <= 100 &&
-                            tup.event.properties.endpoint == 'segmentation';
+                          return tup.event != undefined
+                          && tup.user != undefined
+                          && tup.user.properties.rank <= 100
+                          //&& tup.event.properties.endpoint == 'segmentation';
                         })
                         .map(function (tup){ 
                           return [tup.event.properties.elapsed, 
