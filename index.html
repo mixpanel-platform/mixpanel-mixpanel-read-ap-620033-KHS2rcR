@@ -55,12 +55,10 @@
                         .filter(function(tup) { 
                           return tup.event != undefined && 
                             tup.user != undefined && 
-                            tup.user.properties.rank <= 100;
+                            tup.user.properties.rank <= 100 &&
+                            tup.event.properties.endpoint == 'segmentation';
                         })
                         .map(function (tup){ 
-                          if (tup.event == undefined || tup.user == undefined) {
-                            return [0,0,'none']
-                          }
                           return [tup.event.properties.elapsed, 
                             tup.user.properties.events_tally, 
                             tup.event.properties.endpoint
