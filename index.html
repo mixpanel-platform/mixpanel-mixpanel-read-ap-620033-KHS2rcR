@@ -58,7 +58,7 @@
                           && tup.user != undefined
                           && tup.user.properties.rank <= 100
                           && tup.event.properties.num_days != undefined
-                          && ['funnels','segmentation','retention'].indexOf(tup.event.properties.endpoint) != -1;
+                          //&& ['funnels','segmentation','retention'].indexOf(tup.event.properties.endpoint) != -1;
                         })
                         .map(function (tup){ 
                           return [tup.event.properties.elapsed, 
