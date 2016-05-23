@@ -49,7 +49,7 @@
             
             MP.api.jql(
                 function main() {
-                    return join(Events({from_date: '2016-05-08', to_date: '2016-05-08', 
+                    return join(Events({from_date: '2016-05-22', to_date: '2016-05-22', 
                                         event_selectors:[{event: "API request"}]}), 
                                 People())
                         .filter(function(tup) { 
@@ -69,8 +69,8 @@
                 function(results) {
                   //results = results.map(function(r) {return {'x':r.value, 'y':r.value, 't':r.key[0]};});
                   
-                  x.domain(d3.extent(results, function(d) {return d[0];})).nice();
-                  y.domain(d3.extent(results, function(d) {return d[1];})).nice();
+                  x.domain(d3.extent(results, function(d) {return d[1];})).nice();
+                  y.domain(d3.extent(results, function(d) {return d[0];})).nice();
                   
                   svg.append("g")
                       .attr("class", "x axis")
@@ -81,7 +81,7 @@
                       .attr("x", width)
                       .attr("y", -6)
                       .style("text-anchor", "end")
-                      .text("elapsed");
+                      .text("event tally");
                     
                   svg.append("g")
                       .attr("class", "y axis")
@@ -92,15 +92,15 @@
                       .attr("y", 6)
                       .attr("dy", ".71em")
                       .style("text-anchor", "end")
-                      .text("event tally");
+                      .text("elapsed");
                     
                   svg.selectAll(".dot")
                       .data(results)
                     .enter().append("circle")
                       .attr("class", "dot")
                       .attr("r", 1)
-                      .attr("cx", function(d) { return x(d[0]); })
-                      .attr("cy", function(d) { return y(d[1]); })
+                      .attr("cx", function(d) { return x(d[1]); })
+                      .attr("cy", function(d) { return y(d[0]); })
                       .style("fill", function(d) { return color(d[2]); });
                   
                   var legend = svg.selectAll(".legend")
