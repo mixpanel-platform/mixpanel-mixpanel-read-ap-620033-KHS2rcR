@@ -49,13 +49,15 @@
             
             MP.api.jql(
                 function main() {
-                    return join(Events({from_date: '2016-05-22', to_date: '2016-05-22', 
+                    today = new Date().toISOString().slice(0,10);
+                    return join(Events({from_date: today, to_date: today, 
                                         event_selectors:[{event: "API request"}]}), 
                                 People())
                         .filter(function(tup) { 
                           return tup.event != undefined
                           && tup.user != undefined
                           && tup.user.properties.rank <= 100
+                          && tup.event.properties.num_days != undefined
                           && ['funnels','segmentation','retention'].indexOf(tup.event.properties.endpoint) != -1;
                         })
                         .map(function (tup){ 
