@@ -9,6 +9,9 @@
   </head>
   <body class="mixpanel-platform-body">
     <style>
+    body.mixpanel-platform-body {
+      background:white;
+    }
       .axis path,
       .axis line {
         fill: none;
@@ -21,7 +24,7 @@
       }
     </style>
     <script>
-        var margin = {top: 20, right: 20, bottom: 30, left: 100},
+        var margin = {top: 20, right: 20, bottom: 30, left: 50},
             width = 960 - margin.left - margin.right,
             height = 500 - margin.top - margin.bottom;
 
@@ -31,7 +34,7 @@
             var y = d3.scale.log()
             .range([height, 0]);
 
-            var color = d3.scale.category10();
+            var color = d3.scale.category20();
 
             var xAxis = d3.svg.axis()
             .scale(x)
@@ -58,7 +61,15 @@
                           && tup.user != undefined
                           && tup.user.properties.rank <= 100
                           && tup.event.properties.num_days != undefined
-                          //&& ['funnels','segmentation','retention'].indexOf(tup.event.properties.endpoint) != -1;
+                          && [
+                            'funnels',
+                            'segmentation',
+                            'retention', 
+                            'events/properties', 
+                            'events/names', 
+                            'events', 
+                            'segmentation/sum',
+                            ].indexOf(tup.event.properties.endpoint) != -1;
                         })
                         .map(function (tup){ 
                           return [tup.event.properties.elapsed, 
