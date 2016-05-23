@@ -62,7 +62,7 @@
                         })
                         .map(function (tup){ 
                           return [tup.event.properties.elapsed, 
-                            tup.user.properties.events_tally, 
+                            tup.user.properties.events_tally * (tup.event.properties.num_days / 30.5) , 
                             tup.event.properties.endpoint
                             ]; 
                         });
@@ -83,7 +83,7 @@
                       .attr("x", width)
                       .attr("y", -6)
                       .style("text-anchor", "end")
-                      .text("event tally");
+                      .text("events queried (approx)");
                     
                   svg.append("g")
                       .attr("class", "y axis")
