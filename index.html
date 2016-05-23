@@ -62,18 +62,18 @@
                           && tup.user.properties.rank <= 100
                           && tup.event.properties.num_days != undefined
                           && [
-                            'funnels',
-                            'segmentation',
+                            //'funnels',
+                            //'segmentation',
                             'retention', 
-                            'events/properties', 
-                            'events/names', 
-                            'events', 
-                            'segmentation/sum',
+                            //'events/properties', 
+                            //'events/names', 
+                            //'events', 
+                            //'segmentation/sum',
                             ].indexOf(tup.event.properties.endpoint) != -1;
                         })
                         .map(function (tup){ 
                           return [tup.event.properties.elapsed, 
-                            tup.user.properties.events_tally * (tup.event.properties.num_days / 30.5) , 
+                            tup.user.properties.events_tally * (tup.event.properties.num_days / 30.5), 
                             tup.event.properties.endpoint
                             ]; 
                         });
