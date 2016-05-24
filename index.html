@@ -60,27 +60,27 @@
                     .filter(function(tup) { 
                       return tup.event != undefined
                       && tup.user != undefined
-                      && tup.user.properties.rank <= 100
+                      && tup.user.properties.rank <= 500
                       && tup.event.properties.num_days != undefined
                       && [
-                        'funnels',
-                        'segmentation',
+                        //'funnels',
+                        //'segmentation',
                         'retention', 
-                        'events/properties', 
-                        'events/names', 
-                        'events', 
-                        'segmentation/sum',
+                        //'events/properties', 
+                        //'events/names', 
+                        //'events',
                         ].indexOf(tup.event.properties.endpoint) != -1;
                     })
                     .map(function (tup){ 
                       return [tup.event.properties.elapsed, 
                         tup.user.properties.events_tally * (tup.event.properties.num_days / 31.0), 
-                        tup.event.properties.endpoint
+                        tup.event.properties.endpoint + "/" + tup.event.properties.unit
                         ]; 
                     });
             }
         ).done(
             function(results) {
+              console.log(results)
               //results = results.map(function(r) {return {'x':r.value, 'y':r.value, 't':r.key[0]};});
               
               x.domain(d3.extent(results, function(d) {return d[1];})).nice();
