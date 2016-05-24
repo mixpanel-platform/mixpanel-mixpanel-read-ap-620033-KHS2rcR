@@ -8,6 +8,7 @@
     <script src="//d3js.org/d3.v3.min.js"></script>
   </head>
   <body class="mixpanel-platform-body">
+    <div id="date-picker"></div>
     <style>
     body.mixpanel-platform-body {
       background:white;
@@ -24,6 +25,11 @@
       }
     </style>
     <script>
+        $('#date-picker').MPDatepicker().on('change', function(dateRange) {
+            console.log(dateRange);
+            refresh(dateRange.from, dateRange.to);
+        });
+
         var margin = {top: 20, right: 20, bottom: 30, left: 50},
             width = 960 - margin.left - margin.right,
             height = 500 - margin.top - margin.bottom;
@@ -50,94 +56,97 @@
         .append("g")
         .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
         
-        MP.api.jql(
+        
+        function refresh(from_date, to_date) {
+          console.log(from_date);
+          console.log(to_date);
+          MP.api.jql(
             function main() {
-                var to = new Date().toISOString().slice(0,10);
-                var from = new Date(to - 86400000);
-                return join(Events({from_date: from, to_date: to, 
-                                    event_selectors:[{event: "API request"}]}), 
-                            People())
-                    .filter(function(tup) { 
-                      return tup.event != undefined
-                      && tup.user != undefined
-                      && tup.user.properties.rank <= 500
-                      && tup.event.properties.num_days != undefined
-                      && [
-                        //'funnels',
-                        //'segmentation',
-                        'retention', 
-                        //'events/properties', 
-                        //'events/names', 
-                        //'events',
-                        ].indexOf(tup.event.properties.endpoint) != -1;
-                    })
-                    .map(function (tup){ 
-                      return [tup.event.properties.elapsed, 
-                        tup.user.properties.events_tally * (tup.event.properties.num_days / 31.0), 
-                        tup.event.properties.endpoint + "/" + tup.event.properties.unit
-                        ]; 
-                    });
-            }
-        ).done(
-            function(results) {
-              console.log(results)
-              //results = results.map(function(r) {return {'x':r.value, 'y':r.value, 't':r.key[0]};});
-              
-              x.domain(d3.extent(results, function(d) {return d[1];})).nice();
-              y.domain(d3.extent(results, function(d) {return d[0];})).nice();
-              
-              svg.append("g")
-                  .attr("class", "x axis")
-                  .attr("transform", "translate(0," + height + ")")
-                  .call(xAxis)
-                .append("text")
-                  .attr("class", "label")
-                  .attr("x", width)
-                  .attr("y", -6)
-                  .style("text-anchor", "end")
-                  .text("events queried (approx)");
+              return join(Events({from_date: params.from_date, to_date: params.to_date, 
+                                  event_selectors:[{event: "API request"}]}), 
+                          People())
+                  .filter(function(tup) { 
+                    return tup.event != undefined
+                    && tup.user != undefined
+                    && tup.user.properties.rank <= 500
+                    && tup.event.properties.num_days != undefined
+                    && [
+                      //'funnels',
+                      //'segmentation',
+                      'retention', 
+                      //'events/properties', 
+                      //'events/names', 
+                      //'events',
+                      ].indexOf(tup.event.properties.endpoint) != -1;
+                  })
+                  .map(function (tup){ 
+                    return [tup.event.properties.elapsed, 
+                      tup.user.properties.events_tally * (tup.event.properties.num_days / 31.0), 
+                      tup.event.properties.endpoint + "/" + tup.event.properties.unit
+                      ]; 
+                  });
+              }, 
+              {from_date:from_date, to_date:to_date}
+          ).done(
+              function(results) {
+                console.log(results)
+                //results = results.map(function(r) {return {'x':r.value, 'y':r.value, 't':r.key[0]};});
                 
-              svg.append("g")
-                  .attr("class", "y axis")
-                  .call(yAxis)
-                .append("text")
-                  .attr("class", "label")
-                  .attr("transform", "rotate(-90)")
-                  .attr("y", 6)
-                  .attr("dy", ".71em")
-                  .style("text-anchor", "end")
-                  .text("elapsed");
+                x.domain(d3.extent(results, function(d) {return d[1];})).nice();
+                y.domain(d3.extent(results, function(d) {return d[0];})).nice();
                 
-              svg.selectAll(".dot")
-                  .data(results)
-                .enter().append("circle")
-                  .attr("class", "dot")
-                  .attr("r", 1)
-                  .attr("cx", function(d) { return x(d[1]); })
-                  .attr("cy", function(d) { return y(d[0]); })
-                  .style("fill", function(d) { return color(d[2]); });
+                svg.append("g")
+                    .attr("class", "x axis")
+                    .attr("transform", "translate(0," + height + ")")
+                    .call(xAxis)
+                  .append("text")
+                    .attr("class", "label")
+                    .attr("x", width)
+                    .attr("y", -6)
+                    .style("text-anchor", "end")
+                    .text("events queried (approx)");
+                  
+                svg.append("g")
+                    .attr("class", "y axis")
+                    .call(yAxis)
+                  .append("text")
+                    .attr("class", "label")
+                    .attr("transform", "rotate(-90)")
+                    .attr("y", 6)
+                    .attr("dy", ".71em")
+                    .style("text-anchor", "end")
+                    .text("elapsed");
+                  
+                svg.selectAll(".dot")
+                    .data(results)
+                  .enter().append("circle")
+                    .attr("class", "dot")
+                    .attr("r", 1)
+                    .attr("cx", function(d) { return x(d[1]); })
+                    .attr("cy", function(d) { return y(d[0]); })
+                    .style("fill", function(d) { return color(d[2]); });
+                
+                var legend = svg.selectAll(".legend")
+                    .data(color.domain())
+                  .enter().append("g")
+                    .attr("class", "legend")
+                    .attr("transform", function(d, i) { return "translate(0," + i * 20 + ")"; });
               
-              var legend = svg.selectAll(".legend")
-                  .data(color.domain())
-                .enter().append("g")
-                  .attr("class", "legend")
-                  .attr("transform", function(d, i) { return "translate(0," + i * 20 + ")"; });
-            
-              legend.append("rect")
-                  .attr("x", width - 18)
-                  .attr("width", 18)
-                  .attr("height", 18)
-                  .style("fill", color);
-            
-              legend.append("text")
-                  .attr("x", width - 24)
-                  .attr("y", 9)
-                  .attr("dy", ".35em")
-                  .style("text-anchor", "end")
-                  .text(function(d) { return d; });
-            }
-        );
-
+                legend.append("rect")
+                    .attr("x", width - 18)
+                    .attr("width", 18)
+                    .attr("height", 18)
+                    .style("fill", color);
+              
+                legend.append("text")
+                    .attr("x", width - 24)
+                    .attr("y", 9)
+                    .attr("dy", ".35em")
+                    .style("text-anchor", "end")
+                    .text(function(d) { return d; });
+              }
+          );
+        }
     </script>
   </body>
 </html>
