@@ -19,7 +19,6 @@
         stroke: #000;
         shape-rendering: crispEdges;
       }
-      
       .dot {
         stroke: none;
       }
@@ -29,14 +28,15 @@
             refresh(dateRange.from, dateRange.to);
         });
 
-        var endpoints = [
-          'funnels',
-          //'segmentation',
-          'retention', 
-          //'events/properties', 
-          //'events/names', 
-          //'events',
-        ]
+        var endpoints = {
+          'funnels': {m: 4.484e-9, c: 0.134 },
+          'segmentation': {m: 2.270e-9, c: 0.540},
+          'retention': {m: 4.404e-9, c: 0.252}, 
+          'events/properties': {m: 0, c: 1.000}, 
+          'events/names': {m: 0, c: 1.000}, 
+          'events': {m: 0, c: 1.000},
+        };
+        var labels = _.keys(endpoints);
         
         var margin = {top: 20, right: 20, bottom: 30, left: 60},
             width = 960 - margin.left - margin.right,
@@ -71,6 +71,16 @@
         .append("g")
         .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
         
+        var brush = d3.svg.brush()
+        .x(x)
+        .y(y)
+        .on("brushend", function() {
+          var e = brush.extent();
+          console.log(e);
+          var slope = (e[1][1] - e[0][1]) / (e[1][0] - e[0][0]);
+          var yinter = e[1][1] - slope*e[1][0];
+          console.log("y = " + slope + "x + " + yinter);
+        });
         
         function refresh(from_date, to_date) {
           MP.api.jql(
@@ -96,17 +106,18 @@
               {
                 from_date:from_date.toISOString().slice(0,10), 
                 to_date:to_date.toISOString().slice(0,10),
-                endpoints: endpoints,
+                endpoints: labels,
                 //project_id:429755,
               }
           ).done(
               function(results) {
-                console.log(results)
                 //results = results.map(function(r) {return {'x':r.value, 'y':r.value, 't':r.key[0]};});
                 
                 var dot_size = s(results.length);
-                x.domain([1, d3.max(results, function(d) {return d[1];})]).nice();
-                y.domain([0.001, d3.max(results, function(d) {return d[0];})]).nice();
+                x.domain(d3.extent(results, function(d) {return d[1];})).nice();
+                y.domain(d3.extent(results, function(d) {return d[0];})).nice();
+                
+                svg.call(brush);
                 
                 svg.append("g")
                     .attr("class", "x axis")
@@ -129,7 +140,7 @@
                     .attr("dy", ".71em")
                     .style("text-anchor", "end")
                     .text("elapsed (sec)");
-                  
+                
                 svg.selectAll(".dot")
                     .data(results)
                   .enter().append("circle")
@@ -137,7 +148,7 @@
                     .attr("r", dot_size + "px")
                     .attr("cx", function(d) { return x(d[1]); })
                     .attr("cy", function(d) { return y(d[0]); })
-                    .style("fill", function(d) { return color(endpoints[d[2]]); });
+                    .style("fill", function(d) { return color(labels[d[2]]); });
                 
                 var legend = svg.selectAll(".legend")
                     .data(color.domain())
