@@ -25,28 +25,43 @@
       }
     </style>
     <script>
-        $('#date-picker').MPDatepicker().on('change', function(dateRange) {
-            console.log(dateRange);
+        $('#date-picker').MPDatepicker().on('change', function(event, dateRange) {
             refresh(dateRange.from, dateRange.to);
         });
 
-        var margin = {top: 20, right: 20, bottom: 30, left: 50},
+        var endpoints = [
+          'funnels',
+          //'segmentation',
+          'retention', 
+          //'events/properties', 
+          //'events/names', 
+          //'events',
+        ]
+        
+        var margin = {top: 20, right: 20, bottom: 30, left: 60},
             width = 960 - margin.left - margin.right,
             height = 500 - margin.top - margin.bottom;
 
+        var s = d3.scale.linear()
+          .domain([0, 20000])
+          .range([3, 0.2])
+          .clamp(true);
+          
         var x = d3.scale.log()
         .range([0, width]);
 
         var y = d3.scale.log()
         .range([height, 0]);
 
-        var color = d3.scale.category20();
+        var color = d3.scale.category10().domain(endpoints);
 
         var xAxis = d3.svg.axis()
+        .ticks(10, d3.format(",.2s"))
         .scale(x)
         .orient("bottom");
 
         var yAxis = d3.svg.axis()
+        .ticks(10, d3.format(",.2f"))
         .scale(y)
         .orient("left");
 
@@ -58,8 +73,6 @@
         
         
         function refresh(from_date, to_date) {
-          console.log(from_date);
-          console.log(to_date);
           MP.api.jql(
             function main() {
               return join(Events({from_date: params.from_date, to_date: params.to_date, 
@@ -70,30 +83,30 @@
                     && tup.user != undefined
                     && tup.user.properties.rank <= 500
                     && tup.event.properties.num_days != undefined
-                    && [
-                      //'funnels',
-                      //'segmentation',
-                      'retention', 
-                      //'events/properties', 
-                      //'events/names', 
-                      //'events',
-                      ].indexOf(tup.event.properties.endpoint) != -1;
+                    && (params.project_id == undefined || tup.event.properties['project id'] == params.project_id)
+                    && params.endpoints.indexOf(tup.event.properties.endpoint) != -1;
                   })
                   .map(function (tup){ 
-                    return [tup.event.properties.elapsed, 
+                    return [tup.event.properties.elapsed / 1000, 
                       tup.user.properties.events_tally * (tup.event.properties.num_days / 31.0), 
-                      tup.event.properties.endpoint + "/" + tup.event.properties.unit
+                      params.endpoints.indexOf(tup.event.properties.endpoint)
                       ]; 
                   });
               }, 
-              {from_date:from_date, to_date:to_date}
+              {
+                from_date:from_date.toISOString().slice(0,10), 
+                to_date:to_date.toISOString().slice(0,10),
+                endpoints: endpoints,
+                //project_id:429755,
+              }
           ).done(
               function(results) {
                 console.log(results)
                 //results = results.map(function(r) {return {'x':r.value, 'y':r.value, 't':r.key[0]};});
                 
-                x.domain(d3.extent(results, function(d) {return d[1];})).nice();
-                y.domain(d3.extent(results, function(d) {return d[0];})).nice();
+                var dot_size = s(results.length);
+                x.domain([1, d3.max(results, function(d) {return d[1];})]).nice();
+                y.domain([0.001, d3.max(results, function(d) {return d[0];})]).nice();
                 
                 svg.append("g")
                     .attr("class", "x axis")
@@ -115,16 +128,16 @@
                     .attr("y", 6)
                     .attr("dy", ".71em")
                     .style("text-anchor", "end")
-                    .text("elapsed");
+                    .text("elapsed (sec)");
                   
                 svg.selectAll(".dot")
                     .data(results)
                   .enter().append("circle")
                     .attr("class", "dot")
-                    .attr("r", 1)
+                    .attr("r", dot_size + "px")
                     .attr("cx", function(d) { return x(d[1]); })
                     .attr("cy", function(d) { return y(d[0]); })
-                    .style("fill", function(d) { return color(d[2]); });
+                    .style("fill", function(d) { return color(endpoints[d[2]]); });
                 
                 var legend = svg.selectAll(".legend")
                     .data(color.domain())
