@@ -71,7 +71,7 @@
         .append("g")
         .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
         
-        var brush = d3.svg.brush()
+        /*var brush = d3.svg.brush()
         .x(x)
         .y(y)
         .on("brushend", function() {
@@ -80,7 +80,7 @@
           var slope = (e[1][1] - e[0][1]) / (e[1][0] - e[0][0]);
           var yinter = e[1][1] - slope*e[1][0];
           console.log("y = " + slope + "x + " + yinter);
-        });
+        });*/
         
         function refresh(from_date, to_date) {
           MP.api.jql(
@@ -94,7 +94,8 @@
                     && tup.user.properties.rank <= 500
                     && tup.event.properties.num_days != undefined
                     && (params.project_id == undefined || tup.event.properties['project id'] == params.project_id)
-                    && params.endpoints.indexOf(tup.event.properties.endpoint) != -1;
+                    && params.endpoints.indexOf(tup.event.properties.endpoint) != -1
+                    && Math.random() < 0.01; //sampling for debug
                   })
                   .map(function (tup){ 
                     return [tup.event.properties.elapsed / 1000, 
@@ -117,7 +118,7 @@
                 x.domain(d3.extent(results, function(d) {return d[1];})).nice();
                 y.domain(d3.extent(results, function(d) {return d[0];})).nice();
                 
-                svg.call(brush);
+                //svg.call(brush);
                 
                 svg.append("g")
                     .attr("class", "x axis")
@@ -149,6 +150,16 @@
                     .attr("cx", function(d) { return x(d[1]); })
                     .attr("cy", function(d) { return y(d[0]); })
                     .style("fill", function(d) { return color(labels[d[2]]); });
+                
+                svg.selectAll(".line")
+                  .data(_.keys(endpoints))
+                .enter().append("line")
+                  .attr("class", "line")
+                  .attr("x1", function(d) { return x(x.domain()[0]); })
+                  .attr("y1", function(d) { return y(endpoints[d].m * x.domain()[0] + endpoints[d].c); })
+                  .attr("x2", function(d) { return x(x.domain()[1]); })
+                  .attr("y2", function(d) { return y(endpoints[d].m * x.domain()[1] + endpoints[d].c); })
+                  .style("stroke", function(d) { return color(d); });
                 
                 var legend = svg.selectAll(".legend")
                     .data(color.domain())
