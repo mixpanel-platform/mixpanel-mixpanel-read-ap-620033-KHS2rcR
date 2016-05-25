@@ -9,6 +9,8 @@
   </head>
   <body class="mixpanel-platform-body">
     <div id="date-picker"></div>
+    <div id="query-times"></div>
+    <div id="customers"></div>
     <style>
     body.mixpanel-platform-body {
       background:white;
@@ -22,26 +24,60 @@
       .dot {
         stroke: none;
       }
+      .threshold {
+        stroke-width: 1;
+        fill: none;
+      }
     </style>
     <script>
-        $('#date-picker').MPDatepicker().on('change', function(event, dateRange) {
-            refresh(dateRange.from, dateRange.to);
-        });
+      $('#date-picker').MPDatepicker().on('change', function(event, dateRange) {
+          refresh(dateRange.from.toISOString().slice(0,10), dateRange.to.toISOString().slice(0,10));
+      });
 
-        var endpoints = {
-          'funnels': {m: 4.484e-9, c: 0.134 },
-          'segmentation': {m: 2.270e-9, c: 0.540},
-          'retention': {m: 4.404e-9, c: 0.252}, 
-          'events/properties': {m: 0, c: 1.000}, 
-          'events/names': {m: 0, c: 1.000}, 
-          'events': {m: 0, c: 1.000},
-        };
-        var labels = _.keys(endpoints);
-        
-        var margin = {top: 20, right: 20, bottom: 30, left: 60},
-            width = 960 - margin.left - margin.right,
-            height = 500 - margin.top - margin.bottom;
-
+      // thresholds are linear in the form y = mx + c
+      // where x is the date-range adjusted tally, and y
+      // is the query duration in seconds
+      var thresholds = {
+        'funnels': {m: 1.0e-9, c: 1.0},
+        'segmentation': {m: 2.0e-9, c: 1.0},
+        'retention': {m: 5e-9, c: 1.0}, 
+        //'events/properties': {m: 0, c: 1.0}, 
+        //'events/names': {m: 0, c: 1.0}, 
+        //'events': {m: 0, c: 1.0},
+        'timeout': {m: 0, c: 120.0},
+      };
+      var labels = _.keys(thresholds).sort();
+      var qperfResults = [];
+      function getQperfJQL() {
+        return function main() {
+            return join(Events({from_date: params.from_date, to_date: params.to_date, 
+                                event_selectors:[{event: "API request"}]}), 
+                        People())
+                .filter(function(tup) { 
+                  return tup.event != undefined
+                  && tup.user != undefined
+                  && tup.user.properties.rank <= 500
+                  && tup.event.properties.num_days != undefined
+                  && (params.project_id == undefined || tup.event.properties['project id'] == params.project_id)
+                  && params.types.indexOf(tup.event.properties.endpoint) != -1
+                  && Math.random() < 0.01; //sampling for debug
+                })
+                .map(function (tup){
+                  var threshold = params.thresholds[tup.event.properties.endpoint];
+                  var elapsed = tup.event.properties.elapsed / 1000;
+                  var tally = tup.user.properties.events_tally * (tup.event.properties.num_days / 31.0);
+                  var type_index = params.types.indexOf(tup.event.properties.endpoint);
+                  var slow = elapsed > ((threshold.m * tally) + threshold.c) ? 1 : 0;
+                  return [elapsed, tally, type_index, slow, tup.event.properties['project id']];
+                });
+            };
+      }
+      
+      var margin = {top: 20, right: 20, bottom: 30, left: 60},
+          width = 960 - margin.left - margin.right,
+          height = 500 - margin.top - margin.bottom;
+      
+      function createQperfScatter() {
         var s = d3.scale.linear()
           .domain([0, 20000])
           .range([3, 0.2])
@@ -49,139 +85,134 @@
           
         var x = d3.scale.log()
         .range([0, width]);
-
+  
         var y = d3.scale.log()
         .range([height, 0]);
-
-        var color = d3.scale.category10().domain(endpoints);
-
+  
+        var color = d3.scale.category10().domain(thresholds);
+  
         var xAxis = d3.svg.axis()
         .ticks(10, d3.format(",.2s"))
         .scale(x)
         .orient("bottom");
-
+  
         var yAxis = d3.svg.axis()
         .ticks(10, d3.format(",.2f"))
         .scale(y)
         .orient("left");
-
-        var svg = d3.select("body").append("svg")
+  
+        var query_times = d3.select("#query-times").append("svg")
         .attr("width", width + margin.left + margin.right)
         .attr("height", height + margin.top + margin.bottom)
         .append("g")
         .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
         
-        /*var brush = d3.svg.brush()
-        .x(x)
-        .y(y)
-        .on("brushend", function() {
-          var e = brush.extent();
-          console.log(e);
-          var slope = (e[1][1] - e[0][1]) / (e[1][0] - e[0][0]);
-          var yinter = e[1][1] - slope*e[1][0];
-          console.log("y = " + slope + "x + " + yinter);
-        });*/
+        var dot_size = s(qperfResults.length);
+        x.domain(d3.extent(qperfResults, function(d) {return d[1];})).nice();
+        y.domain(d3.extent(qperfResults, function(d) {return d[0];})).nice();
         
-        function refresh(from_date, to_date) {
-          MP.api.jql(
-            function main() {
-              return join(Events({from_date: params.from_date, to_date: params.to_date, 
-                                  event_selectors:[{event: "API request"}]}), 
-                          People())
-                  .filter(function(tup) { 
-                    return tup.event != undefined
-                    && tup.user != undefined
-                    && tup.user.properties.rank <= 500
-                    && tup.event.properties.num_days != undefined
-                    && (params.project_id == undefined || tup.event.properties['project id'] == params.project_id)
-                    && params.endpoints.indexOf(tup.event.properties.endpoint) != -1
-                    && Math.random() < 0.01; //sampling for debug
-                  })
-                  .map(function (tup){ 
-                    return [tup.event.properties.elapsed / 1000, 
-                      tup.user.properties.events_tally * (tup.event.properties.num_days / 31.0), 
-                      params.endpoints.indexOf(tup.event.properties.endpoint)
-                      ]; 
-                  });
-              }, 
-              {
-                from_date:from_date.toISOString().slice(0,10), 
-                to_date:to_date.toISOString().slice(0,10),
-                endpoints: labels,
-                //project_id:429755,
-              }
-          ).done(
-              function(results) {
-                //results = results.map(function(r) {return {'x':r.value, 'y':r.value, 't':r.key[0]};});
-                
-                var dot_size = s(results.length);
-                x.domain(d3.extent(results, function(d) {return d[1];})).nice();
-                y.domain(d3.extent(results, function(d) {return d[0];})).nice();
-                
-                //svg.call(brush);
-                
-                svg.append("g")
-                    .attr("class", "x axis")
-                    .attr("transform", "translate(0," + height + ")")
-                    .call(xAxis)
-                  .append("text")
-                    .attr("class", "label")
-                    .attr("x", width)
-                    .attr("y", -6)
-                    .style("text-anchor", "end")
-                    .text("events queried (approx)");
-                  
-                svg.append("g")
-                    .attr("class", "y axis")
-                    .call(yAxis)
-                  .append("text")
-                    .attr("class", "label")
-                    .attr("transform", "rotate(-90)")
-                    .attr("y", 6)
-                    .attr("dy", ".71em")
-                    .style("text-anchor", "end")
-                    .text("elapsed (sec)");
-                
-                svg.selectAll(".dot")
-                    .data(results)
-                  .enter().append("circle")
-                    .attr("class", "dot")
-                    .attr("r", dot_size + "px")
-                    .attr("cx", function(d) { return x(d[1]); })
-                    .attr("cy", function(d) { return y(d[0]); })
-                    .style("fill", function(d) { return color(labels[d[2]]); });
-                
-                svg.selectAll(".line")
-                  .data(_.keys(endpoints))
-                .enter().append("line")
-                  .attr("class", "line")
-                  .attr("x1", function(d) { return x(x.domain()[0]); })
-                  .attr("y1", function(d) { return y(endpoints[d].m * x.domain()[0] + endpoints[d].c); })
-                  .attr("x2", function(d) { return x(x.domain()[1]); })
-                  .attr("y2", function(d) { return y(endpoints[d].m * x.domain()[1] + endpoints[d].c); })
-                  .style("stroke", function(d) { return color(d); });
-                
-                var legend = svg.selectAll(".legend")
-                    .data(color.domain())
-                  .enter().append("g")
-                    .attr("class", "legend")
-                    .attr("transform", function(d, i) { return "translate(0," + i * 20 + ")"; });
-              
-                legend.append("rect")
-                    .attr("x", width - 18)
-                    .attr("width", 18)
-                    .attr("height", 18)
-                    .style("fill", color);
-              
-                legend.append("text")
-                    .attr("x", width - 24)
-                    .attr("y", 9)
-                    .attr("dy", ".35em")
-                    .style("text-anchor", "end")
-                    .text(function(d) { return d; });
-              }
-          );
-        }
+        query_times.append("g")
+            .attr("class", "x axis")
+            .attr("transform", "translate(0," + height + ")")
+            .call(xAxis)
+          .append("text")
+            .attr("class", "label")
+            .attr("x", width)
+            .attr("y", -6)
+            .style("text-anchor", "end")
+            .text("events queried (approx)");
+          
+        query_times.append("g")
+            .attr("class", "y axis")
+            .call(yAxis)
+          .append("text")
+            .attr("class", "label")
+            .attr("transform", "rotate(-90)")
+            .attr("y", 6)
+            .attr("dy", ".71em")
+            .style("text-anchor", "end")
+            .text("elapsed (sec)");
+        
+        query_times.selectAll(".dot")
+            .data(qperfResults)
+          .enter().append("circle")
+            .attr("class", "dot")
+            .attr("r", dot_size + "px")
+            .attr("cx", function(d) { return x(d[1]); })
+            .attr("cy", function(d) { return y(d[0]); })
+            .style("fill", function(d) { return color(labels[d[2]]); });
+        
+        query_times.selectAll(".threshold")
+          .data(labels)
+        .enter().append("path")
+          .attr("class", "threshold")
+          .style("stroke", function(d) { return color(d); })
+          .attr("d", function (d) {
+            return "M" + _.map(_.range(x.range()[0], x.range()[1]), function (xx) {
+              return xx + "," + y(thresholds[d].m * x.invert(xx) + thresholds[d].c);
+            }).join("L");
+          });
+        
+        var legend = query_times.selectAll(".legend")
+          .data(color.domain())
+        .enter().append("g")
+          .attr("class", "legend")
+          .attr("transform", function(d, i) { return "translate(0," + i * 20 + ")"; });
+      
+        legend.append("rect")
+          .attr("x", width - 18)
+          .attr("width", 18)
+          .attr("height", 18)
+          .style("fill", color);
+      
+        legend.append("text")
+          .attr("x", width - 24)
+          .attr("y", 9)
+          .attr("dy", ".35em")
+          .style("text-anchor", "end")
+          .text(function(d) { return d; });
+      }
+      
+      function refresh(from_date, to_date) {
+        MP.api.jql( getQperfJQL(), {
+              from_date:from_date, 
+              to_date:to_date,
+              types: labels,
+              thresholds: thresholds,
+            }
+        ).done( function(results) {
+          qperfResults = results;
+          createQperfScatter();
+          createCustomerGrid();
+        });
+      }
+      
+      function createCustomerGrid() {
+        MP.api.people({where: 'properties["rank"] < 500'}).done(function(records) {
+          console.log(records[0]);
+          records = _.sortBy(records, function (r) { return r['rank']; });
+          var dsatScores = _.reduce(qperfResults, function (memo, result) {
+            memo[result[4]] = memo[result[4]] || [0,0]; // [not slow, slow]
+            memo[result[4]][result[3]] += 1; 
+            return memo;
+          }, {});
+          
+          var customers = d3.select("#customers").append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+            .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+            
+          customers.selectAll(".customer")
+            .data(records)
+            .enter().append("rect")
+            .attr("x")
+        });
+      }
+      
+      
+       
+        
     </script>
   </body>
 </html>
