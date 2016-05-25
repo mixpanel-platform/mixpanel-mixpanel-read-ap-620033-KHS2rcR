@@ -28,10 +28,18 @@
         stroke-width: 1;
         fill: none;
       }
+      .customer {
+        fill: #EEE;
+      }
     </style>
     <script>
+    
+      var from_date = new Date().toISOString().slice(0,10);
+      var to_date = new Date().toISOString().slice(0,10);
       $('#date-picker').MPDatepicker().on('change', function(event, dateRange) {
-          refresh(dateRange.from.toISOString().slice(0,10), dateRange.to.toISOString().slice(0,10));
+          from_date = dateRange.from.toISOString().slice(0,10);
+          to_date = dateRange.to.toISOString().slice(0,10);
+          refresh();
       });
 
       // thresholds are linear in the form y = mx + c
@@ -47,7 +55,13 @@
         'timeout': {m: 0, c: 120.0},
       };
       var labels = _.keys(thresholds).sort();
-      var qperfResults = [];
+      var qperfResults = []; // the results of all the queries.
+      var dsatCounts = {}; // the slow/fast results grouped by project
+      var topProjects = []; // the people data for the top 500 projects
+      MP.api.people({where: 'properties["rank"] <= 500'}).done(function(records) {
+        topProjects = _.sortBy(_.values(records.values().results), function (r) { return r['$properties']['rank']; });
+      });
+      
       function getQperfJQL() {
         return function main() {
             return join(Events({from_date: params.from_date, to_date: params.to_date, 
@@ -60,7 +74,7 @@
                   && tup.event.properties.num_days != undefined
                   && (params.project_id == undefined || tup.event.properties['project id'] == params.project_id)
                   && params.types.indexOf(tup.event.properties.endpoint) != -1
-                  && Math.random() < 0.01; //sampling for debug
+                  //&& Math.random() < 0.005; //sampling for debug
                 })
                 .map(function (tup){
                   var threshold = params.thresholds[tup.event.properties.endpoint];
@@ -77,7 +91,12 @@
           width = 960 - margin.left - margin.right,
           height = 500 - margin.top - margin.bottom;
       
-      function createQperfScatter() {
+      function createQperfScatter(project_id) {
+        var data = qperfResults;
+        if (project_id != undefined) {
+          data = _.filter(data, function (d) {return d[4] == project_id; });
+        }
+        
         var s = d3.scale.linear()
           .domain([0, 20000])
           .range([3, 0.2])
@@ -100,16 +119,18 @@
         .ticks(10, d3.format(",.2f"))
         .scale(y)
         .orient("left");
-  
+        
+        var dot_size = s(data.length);
+        x.domain(d3.extent(data, function(d) {return d[1];})).nice();
+        y.domain([0.001, 150]).nice();
+        
+        d3.select("#query-times svg").remove();
         var query_times = d3.select("#query-times").append("svg")
         .attr("width", width + margin.left + margin.right)
         .attr("height", height + margin.top + margin.bottom)
         .append("g")
         .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
-        
-        var dot_size = s(qperfResults.length);
-        x.domain(d3.extent(qperfResults, function(d) {return d[1];})).nice();
-        y.domain(d3.extent(qperfResults, function(d) {return d[0];})).nice();
+
         
         query_times.append("g")
             .attr("class", "x axis")
@@ -173,45 +194,60 @@
           .text(function(d) { return d; });
       }
       
-      function refresh(from_date, to_date) {
-        MP.api.jql( getQperfJQL(), {
-              from_date:from_date, 
-              to_date:to_date,
-              types: labels,
-              thresholds: thresholds,
-            }
-        ).done( function(results) {
-          qperfResults = results;
-          createQperfScatter();
-          createCustomerGrid();
-        });
-      }
-      
       function createCustomerGrid() {
-        MP.api.people({where: 'properties["rank"] < 500'}).done(function(records) {
-          console.log(records[0]);
-          records = _.sortBy(records, function (r) { return r['rank']; });
-          var dsatScores = _.reduce(qperfResults, function (memo, result) {
-            memo[result[4]] = memo[result[4]] || [0,0]; // [not slow, slow]
-            memo[result[4]][result[3]] += 1; 
-            return memo;
-          }, {});
-          
+          d3.select("#customers svg").remove();
           var customers = d3.select("#customers").append("svg")
             .attr("width", width + margin.left + margin.right)
             .attr("height", height + margin.top + margin.bottom)
             .append("g")
             .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
-            
+          
+          var dsatColor = d3.scale.linear().domain([0,1]).range(["green", "yellow", "red"]);
+          function dsatScore(project_id) {
+            var counts = dsatCounts[project_id] || [0,0];
+            var total = counts[0] + counts[1];
+            return total == 0 ? -1 : counts[1] / total;
+          }
+          
+          var box = 20;
+          var rows = Math.floor(width / box);
           customers.selectAll(".customer")
             .data(records)
             .enter().append("rect")
-            .attr("x")
+            .attr("class", "customer")
+            .attr("width", box * 0.9).attr("height", box * 0.9)
+            .attr("x", function (d) {return (d['$properties']['rank'] % rows) * box;})
+            .attr("y", function (d) {return Math.floor(d['$properties']['rank'] / rows) * box;})
+            .style("fill", function (d) { 
+              var score = dsatScore(d['$distinct_id']); 
+              return score == -1 ? "#EEE" : dsatColor(score); 
+            })
+            .on("click", function (d) {createQperfScatter(d['$distinct_id'])});
+        });
+      }
+      
+      function refresh(project_id) {
+        MP.api.jql( getQperfJQL(), {
+              from_date:from_date, 
+              to_date:to_date,
+              types: labels,
+              thresholds: thresholds,
+              project_id: project_id,
+            }
+        ).done( function(results) {
+          qperfResults = results;
+          dsatCounts = _.reduce(qperfResults, function (memo, result) {
+            memo[result[4]] = memo[result[4]] || [0,0]; // [not_slow, slow]
+            memo[result[4]][result[3]] += 1; 
+            return memo;
+          }, {});
+          
+          createQperfScatter();
+          createCustomerGrid();
         });
       }
       
       
-       
         
     </script>
   </body>
