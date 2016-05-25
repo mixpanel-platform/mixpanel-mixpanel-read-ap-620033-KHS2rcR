@@ -212,7 +212,7 @@
         var box = 20;
         var rows = Math.floor(width / box);
         customers.selectAll(".customer")
-          .data(records)
+          .data(topProjects)
           .enter().append("rect")
           .attr("class", "customer")
           .attr("width", box * 0.9).attr("height", box * 0.9)
