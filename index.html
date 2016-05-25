@@ -195,35 +195,34 @@
       }
       
       function createCustomerGrid() {
-          d3.select("#customers svg").remove();
-          var customers = d3.select("#customers").append("svg")
-            .attr("width", width + margin.left + margin.right)
-            .attr("height", height + margin.top + margin.bottom)
-            .append("g")
-            .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+        d3.select("#customers svg").remove();
+        var customers = d3.select("#customers").append("svg")
+          .attr("width", width + margin.left + margin.right)
+          .attr("height", height + margin.top + margin.bottom)
+          .append("g")
+          .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+        
+        var dsatColor = d3.scale.linear().domain([0,1]).range(["green", "yellow", "red"]);
+        function dsatScore(project_id) {
+          var counts = dsatCounts[project_id] || [0,0];
+          var total = counts[0] + counts[1];
+          return total == 0 ? -1 : counts[1] / total;
+        }
           
-          var dsatColor = d3.scale.linear().domain([0,1]).range(["green", "yellow", "red"]);
-          function dsatScore(project_id) {
-            var counts = dsatCounts[project_id] || [0,0];
-            var total = counts[0] + counts[1];
-            return total == 0 ? -1 : counts[1] / total;
-          }
-          
-          var box = 20;
-          var rows = Math.floor(width / box);
-          customers.selectAll(".customer")
-            .data(records)
-            .enter().append("rect")
-            .attr("class", "customer")
-            .attr("width", box * 0.9).attr("height", box * 0.9)
-            .attr("x", function (d) {return (d['$properties']['rank'] % rows) * box;})
-            .attr("y", function (d) {return Math.floor(d['$properties']['rank'] / rows) * box;})
-            .style("fill", function (d) { 
-              var score = dsatScore(d['$distinct_id']); 
-              return score == -1 ? "#EEE" : dsatColor(score); 
-            })
-            .on("click", function (d) {createQperfScatter(d['$distinct_id'])});
-        });
+        var box = 20;
+        var rows = Math.floor(width / box);
+        customers.selectAll(".customer")
+          .data(records)
+          .enter().append("rect")
+          .attr("class", "customer")
+          .attr("width", box * 0.9).attr("height", box * 0.9)
+          .attr("x", function (d) {return (d['$properties']['rank'] % rows) * box;})
+          .attr("y", function (d) {return Math.floor(d['$properties']['rank'] / rows) * box;})
+          .style("fill", function (d) { 
+            var score = dsatScore(d['$distinct_id']); 
+            return score == -1 ? "#EEE" : dsatColor(score); 
+          })
+          .on("click", function (d) {createQperfScatter(d['$distinct_id']);});
       }
       
       function refresh(project_id) {
