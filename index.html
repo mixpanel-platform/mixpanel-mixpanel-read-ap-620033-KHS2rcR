@@ -11,6 +11,7 @@
     <div id="date-picker"></div>
     <div id="query-times"></div>
     <div id="customers"></div>
+
     <style>
     body.mixpanel-platform-body {
       background:white;
@@ -56,10 +57,10 @@
       };
       var labels = _.keys(thresholds).sort();
       var qperfResults = []; // the results of all the queries.
-      var dsatCounts = {}; // the slow/fast results grouped by project
+      var qperfResultsByProject = {};
       var topProjects = []; // the people data for the top 500 projects
       MP.api.people({where: 'properties["rank"] <= 500'}).done(function(records) {
-        topProjects = _.sortBy(_.values(records.values().results), function (r) { return r['$properties']['rank']; });
+        topProjects = _.values(records.values().results);
       });
       
       function getQperfJQL() {
@@ -74,7 +75,7 @@
                   && tup.event.properties.num_days != undefined
                   && (params.project_id == undefined || tup.event.properties['project id'] == params.project_id)
                   && params.types.indexOf(tup.event.properties.endpoint) != -1
-                  //&& Math.random() < 0.005; //sampling for debug
+                  && Math.random() < 0.005; //sampling for debug
                 })
                 .map(function (tup){
                   var threshold = params.thresholds[tup.event.properties.endpoint];
@@ -155,7 +156,7 @@
             .text("elapsed (sec)");
         
         query_times.selectAll(".dot")
-            .data(qperfResults)
+            .data(data)
           .enter().append("circle")
             .attr("class", "dot")
             .attr("r", dot_size + "px")
@@ -195,6 +196,22 @@
       }
       
       function createCustomerGrid() {
+        
+        function dsatScore(project_id) {
+          var counts = qperfResultsByProject[project_id] || [];
+          return counts.length == 0 ? -1 : _.filter(counts, function (q) {return q[4] == 1;}).length / counts.length;
+        }
+        
+        var sorts = {
+          'rank': function (r) {return r['$properties']['rank'];},
+          'name': function (r) {return r['$properties']['name'];},
+          'people_tally': function (r) {return r['$properties']['people_tally'];},
+          'event_tally': function (r) {return r['$properties']['event_tally'];},
+          'queries': function (r) {return (qperfResultsByProject[project_id] || []).length},
+          'score': function (r) {return dsatScore(r['$distinct_id'])},
+        }
+        var data = _.sortBy(topProjects, sorts['rank']);
+        
         d3.select("#customers svg").remove();
         var customers = d3.select("#customers").append("svg")
           .attr("width", width + margin.left + margin.right)
@@ -202,12 +219,8 @@
           .append("g")
           .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
         
-        var dsatColor = d3.scale.linear().domain([0,1]).range(["green", "yellow", "red"]);
-        function dsatScore(project_id) {
-          var counts = dsatCounts[project_id] || [0,0];
-          var total = counts[0] + counts[1];
-          return total == 0 ? -1 : counts[1] / total;
-        }
+        var dsatColor = d3.scale.linear().domain([0, 0.5 ,1]).range(["green", "yellow", "orange", "red", "black"]);
+
           
         var box = 20;
         var rows = Math.floor(width / box);
@@ -235,11 +248,10 @@
             }
         ).done( function(results) {
           qperfResults = results;
-          dsatCounts = _.reduce(qperfResults, function (memo, result) {
-            memo[result[4]] = memo[result[4]] || [0,0]; // [not_slow, slow]
-            memo[result[4]][result[3]] += 1; 
-            return memo;
-          }, {});
+          qperfResultsByProject = _.reduce(qperfResults, function (memo, result) {
+            memo[result[4]] = memo[result[4]] || [];
+            memo[result[4]].push[result];
+          });
           
           createQperfScatter();
           createCustomerGrid();
