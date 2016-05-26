@@ -251,7 +251,7 @@
           qperfResultsByProject = _.reduce(qperfResults, function (memo, result) {
             memo[result[4]] = memo[result[4]] || [];
             memo[result[4]].push[result];
-          });
+          }, {});
           
           createQperfScatter();
           createCustomerGrid();
