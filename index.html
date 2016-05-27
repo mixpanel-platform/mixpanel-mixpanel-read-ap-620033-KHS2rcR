@@ -238,7 +238,6 @@
             .attr("x", width/2)
             .attr("y", 40)
             .style("text-anchor", "middle")
-            .text("events queried" + (xlog ? " (log)" : ""))
             .on("click", function () {xlog = !xlog; updateQperfScatter(currentProject);});
           
         query_times.append("g")
@@ -250,7 +249,6 @@
             .attr("y", -50)
             .attr("x", -height/2)
             .style("text-anchor", "middle")
-            .text("seconds elapsed" + (ylog ? " (log)" : ""))
             .on("click", function () {ylog = !ylog; updateQperfScatter(currentProject);});
             
         var legend = query_times.selectAll(".legend")
@@ -318,6 +316,8 @@
         var query_times = d3.select("#query-times svg g");
         query_times.select(".y.axis").call(yAxis);
         query_times.select(".x.axis").call(xAxis);
+        query_times.select(".x.axis label").text("events queried" + (xlog ? " (log)" : ""));
+        query_times.select(".y.axis label").text("seconds elapsed" + (ylog ? " (log)" : ""));
         
         query_times.selectAll(".dot").remove();
         query_times.selectAll(".dot")
