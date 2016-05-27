@@ -10,7 +10,11 @@
   <body class="mixpanel-platform-body">
     <div id="date-picker"></div>
     <div id="query-times"></div>
-    <div id="customers"></div>
+    <a id="showall" href="">show all</a>
+    <br/>
+    Filter by:
+    <input id="filter" type=text/>
+    <br/>
     Sort by:
     <ul id="sorts">
       <li><a href="">rank</a></li>
@@ -20,10 +24,15 @@
       <li><a href="">queries</a></li>
       <li><a href="">score</a></li>
     </ul>
+    
+    <div id="customers"></div>
 
     <style>
       body.mixpanel-platform-body {
         background:white;
+      }
+      #sorts {
+        display: inline;
       }
       #sorts li {
         display: inline;
@@ -36,6 +45,9 @@
         stroke: #000;
         shape-rendering: crispEdges;
       }
+      .axis .label {
+        cursor: pointer;
+      }
       .dot {
         stroke: none;
       }
@@ -45,38 +57,11 @@
       }
       .customer text {
         fill: #000;
+        pointer-events: none;
       }
     </style>
     <script>
-    
-      var from_date = new Date().toISOString().slice(0,10);
-      var to_date = new Date().toISOString().slice(0,10);
-      $('#date-picker').MPDatepicker().on('change', function(event, dateRange) {
-          from_date = dateRange.from.toISOString().slice(0,10);
-          to_date = dateRange.to.toISOString().slice(0,10);
-          refresh();
-      });
-      $('#sorts li a').on('click', function(event) { 
-        event.preventDefault();
-        createCustomerGrid(event.target.innerText) 
-      });
-            
-      var margin = {top: 20, right: 20, bottom: 30, left: 60},
-          width = 960 - margin.left - margin.right,
-          height = 500 - margin.top - margin.bottom;
-          
-      d3.select("#customers").append("svg")
-        .attr("width", width + margin.left + margin.right)
-        .attr("height", height + margin.top + margin.bottom)
-        .append("g")
-        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
-      
-      d3.select("#query-times").append("svg")
-        .attr("width", width + margin.left + margin.right)
-        .attr("height", height + margin.top + margin.bottom)
-        .append("g")
-        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
-
+      function trans(x, y) { return "translate(" + x + "," + y + ")"; }
       // thresholds are linear in the form y = mx + c
       // where x is the date-range adjusted tally, and y
       // is the query duration in seconds
@@ -90,15 +75,47 @@
         'timeout': {m: 0, c: 120.0},
       };
       var labels = _.keys(thresholds).sort();
+      var labelFilter = labels.slice(0);
       var color = d3.scale.category10().domain(labels);
       var qperfResults = []; // the results of all the queries.
       var qperfResultsByProject = {};
       var topProjects = []; // the people data for the top 500 projects
+      var projectFilter = "";
+      var from_date;
+      var to_date;
+      var xlog = true;
+      var ylog = true;
+      var currentProject;
+      
+      var margin = {top: 20, right: 20, bottom: 45, left: 60},
+          width = 960 - margin.left - margin.right,
+          height = 550 - margin.top - margin.bottom;
+      createQperfScatter();
+      createCustomerGrid();
+      
       MP.api.people({where: 'properties["rank"] <= 500'}).done(function(records) {
         topProjects = _.values(records.values().results);
       });
       
-      refresh();
+      $('#date-picker').MPDatepicker().on('change', function(event, dateRange) {
+          from_date = dateRange.from.toISOString().slice(0,10);
+          to_date = dateRange.to.toISOString().slice(0,10);
+          refresh();
+      }).val({from: new Date(), to:new Date()});
+      $('#showall').on('click', function(event) { 
+        event.preventDefault();
+        currentProject = undefined;
+        updateQperfScatter();
+      });
+      $('#sorts li a').on('click', function(event) { 
+        event.preventDefault();
+        updateCustomerGrid(event.target.innerText);
+      });
+      
+      $('#filter').on('input', function (event) {
+        projectFilter = event.target.value;
+        updateCustomerGrid(event.target.innerText);
+      });
       
       function getQperfJQL() {
         return function main() {
@@ -134,7 +151,7 @@
                   return tup.event != undefined
                   && tup.user != undefined
                   && tup.event.properties.num_days != undefined
-                  && tup.event.properties['project id']
+                  && (params.project_id == undefined || tup.event.properties['project id'] == params.project_id)
                   && params.types.indexOf(tup.event.properties.endpoint) != -1
                 })
                 .reduce(function (accumulators, tuples){
@@ -160,84 +177,42 @@
                 });
             };
       };
-      
-      function createQperfScatter(project_id, xlog, ylog) {
-        var data = (project_id == undefined) ? qperfResults : (qperfResultsByProject[project_id] || []);
-        
-        var s = d3.scale.linear()
-          .domain([0, 20000])
-          .range([3, 0.5])
-          .clamp(true);
-          
-        var x = d3.scale.log()
-        .range([0, width]);
-  
-        var y = d3.scale.log()
-        .range([height, 0]);
-  
-        var xAxis = d3.svg.axis()
-        .ticks(10, d3.format(",.2s"))
-        .scale(x)
-        .orient("bottom");
-  
-        var yAxis = d3.svg.axis()
-        .ticks(10, d3.format(",.2f"))
-        .scale(y)
-        .orient("left");
-        
-        var dot_size = s(data.length);
-        x.domain(d3.extent(data, function(d) {return d[1];})).nice();
-        y.domain([0.001, 150]).nice();
 
-        var query_times = d3.select("#query-times svg g");
-        query_times.selectAll("*").remove();
+      function createQperfScatter() {
+        var query_times = d3.select("#query-times").append("svg")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom)
+        .append("g")
+        .attr("transform", trans(margin.left, margin.top));
+
         query_times.append("g")
             .attr("class", "x axis")
-            .attr("transform", "translate(0," + height + ")")
-            .call(xAxis)
+            .attr("transform", trans(0, height))
           .append("text")
             .attr("class", "label")
-            .attr("x", width)
-            .attr("y", -6)
-            .style("text-anchor", "end")
-            .text("events queried (approx)");
+            .attr("x", width/2)
+            .attr("y", 40)
+            .style("text-anchor", "middle")
+            .text("events queried" + (xlog ? " (log)" : ""))
+            .on("click", function () {xlog = !xlog; updateQperfScatter(currentProject);});
           
         query_times.append("g")
             .attr("class", "y axis")
-            .call(yAxis)
+
           .append("text")
             .attr("class", "label")
             .attr("transform", "rotate(-90)")
-            .attr("y", 6)
-            .attr("dy", ".71em")
-            .style("text-anchor", "end")
-            .text("elapsed (sec)");
-        
-        query_times.selectAll(".dot")
-            .data(data)
-          .enter().append("circle")
-            .attr("class", "dot")
-            .attr("r", dot_size + "px")
-            .attr("cx", function(d) { return x(d[1]); })
-            .attr("cy", function(d) { return y(d[0]); })
-            .style("fill", function(d) { return color(labels[d[2]]); });
-        
-        query_times.selectAll(".threshold")
-          .data(labels)
-        .enter().append("path")
-          .attr("class", "threshold")
-          .style("stroke", function(d) { return color(d); })
-          .attr("d", function (d) {
-            return "M" + _.map(_.range(x.range()[0], x.range()[1]), function (xx) {
-              return xx + "," + y(thresholds[d].m * x.invert(xx) + thresholds[d].c);
-            }).join("L");
-          });
-        
+            .attr("y", -50)
+            .attr("x", -height/2)
+            .style("text-anchor", "middle")
+            .text("seconds elapsed" + (ylog ? " (log)" : ""))
+            .on("click", function () {ylog = !ylog; updateQperfScatter(currentProject);});
+            
         var legend = query_times.selectAll(".legend")
           .data(color.domain())
         .enter().append("g")
           .attr("class", "legend")
-          .attr("transform", function(d, i) { return "translate(0," + i * 20 + ")"; });
+          .attr("transform", function(d, i) { return trans(0, i * 20); });
       
         legend.append("rect")
           .attr("x", width - 18)
@@ -253,7 +228,69 @@
           .text(function(d) { return d; });
       }
       
+      function updateQperfScatter() {
+        var data = (currentProject == undefined) ? qperfResults : (qperfResultsByProject[currentProject] || []);
+        
+        var s = d3.scale.linear()
+          .domain([0, 20000])
+          .range([3, 0.5])
+          .clamp(true);
+        var dot_size = s(data.length)
+          
+        var x = d3.scale[xlog ? 'log' : 'linear']()
+        .domain(d3.extent(data, function(d) {return d[1];})).nice()
+        .range([0, width]);
+  
+        var y = d3.scale[ylog ? 'log' : 'linear']()
+        .domain([0.001, 150]).nice()
+        .range([height, 0]);
+  
+        var xAxis = d3.svg.axis()
+        .ticks(10, d3.format(",.2s"))
+        .scale(x)
+        .orient("bottom");
+  
+        var yAxis = d3.svg.axis()
+        .ticks(10, d3.format(",.2f"))
+        .scale(y)
+        .orient("left");
+        
+        var query_times = d3.select("#query-times svg g");
+        query_times.select(".y.axis").call(yAxis);
+        query_times.select(".x.axis").call(xAxis);
+        
+        query_times.selectAll(".dot").remove();
+        query_times.selectAll(".dot")
+            .data(data)
+          .enter().append("circle")
+            .attr("class", "dot")
+            .attr("r", dot_size + "px")
+            .attr("cx", function(d) { return x(d[1]); })
+            .attr("cy", function(d) { return y(d[0]); })
+            .style("fill", function(d) { return color(labels[d[2]]); });
+        
+        query_times.selectAll(".threshold").remove();
+        query_times.selectAll(".threshold")
+          .data(labels)
+        .enter().append("path")
+          .attr("class", "threshold")
+          .style("stroke", function(d) { return color(d); })
+          .attr("d", function (d) {
+            return "M" + _.map(_.range(x.range()[0], x.range()[1]), function (xx) {
+              return xx + "," + y(thresholds[d].m * x.invert(xx) + thresholds[d].c);
+            }).join("L");
+          });
+      }
+      
       function createCustomerGrid(sort) {
+        d3.select("#customers").append("svg")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom)
+        .append("g")
+        .attr("transform", trans(margin.left, margin.top));
+      }
+      
+      function updateCustomerGrid(sort) {
         function dsatScore(project_id) {
           var counts = qperfResultsByProject[project_id] || [];
           return counts.length == 0 ? -1 : _.filter(counts, function (q) {return q[3] == 1;}).length / counts.length;
@@ -268,61 +305,66 @@
           'queries': function (r) {return -(qperfResultsByProject[r['$distinct_id']] || []).length},
           'score': function (r) {return -dsatScore(r['$distinct_id'])},
         }
-        var data = _.sortBy(topProjects, sorts[sort]);
+        
+        var projectFilterRegex = new RegExp(projectFilter, "gi");
+        var data = _.filter(topProjects, function (d) {
+          return projectFilter == ""
+            || projectFilterRegex.test(d['$properties']['$name'])
+            || projectFilterRegex.test(d['$distinct_id'] + "");
+        });
+        data = _.sortBy(data, sorts[sort]);
 
-        var dsatColor = d3.scale.linear().domain([0, 0.33, 0.67, 1]).range(["green", "yellow", "orange", "red"]);
+        var greenToRed = d3.scale.linear().domain([0, 0.33, 0.67, 1]).range(["green", "yellow", "orange", "red"]);
+        function dsatColor(score) { return score == -1 ? "#CCC" : greenToRed(score) }
         
         var box = [60, 20];
         var cols = Math.floor(width / box[0]);
         var rows = Math.ceil(data.length / cols);
         d3.select("#customers svg").attr('height', rows * box[1] + margin.top + margin.bottom);
         
-        var tiles = d3.selectAll(".customer")
-          .data(data, function (d) {return r['$distinct_id'];});
+        var tiles = d3.select("#customers svg g").selectAll(".customer")
+          .data(data, function (d) {return d['$distinct_id'];});
           
-        tiles.enter().append("g")
+        var tile = tiles.enter()
+          .append("g")
           .attr("class", "customer")
-          .attr("transform", function (d,i){return "translate("+((i%cols)*box[0])+","+(Math.floor(i/cols)*box[1])+")"})
-          .on("click", function (d) {createQperfScatter(d['$distinct_id']);})
+          .on("click", function (d) {currentProject = d['$distinct_id']; updateQperfScatter();})
           .on('mouseover', function (d) {})
-          .on('mouseout', function (d) {})
-          .append("rect")
+          .on('mouseout', function (d) {});
+        tile.append("rect")
           .attr("width", box[0] - 2)
-          .attr("height", box[1] - 2)
-          .style("fill", function (d) { 
-              var score = dsatScore(d['$distinct_id']);
-              return score == -1 ? "#CCC" : dsatColor(score); 
-          })
-          .append("text")
-          .attr("transform", "translate(2,11)")
+          .attr("height", box[1] - 2);
+        tile.append("text")
+          .attr("transform", trans(2,11))
           .text(function (d) { return d['$properties']['$name']; });
           
-        tiles.update()
-          .attr("transform", function (d,i){return "translate("+((i%cols)*box[0])+","+(Math.floor(i/cols)*box[1])+")"});
+        // Enter + Update
+        tiles.transition().attr("transform", function (d,i){
+          return trans((i % cols) * box[0], Math.floor(i / cols) * box[1]);
+        });
+        tiles.select("rect").style("fill", function (d) { return dsatColor(dsatScore(d['$distinct_id']));});
+        
+        tiles.exit().remove();
       }
       
       function refresh(project_id) {
         MP.api.jql( getQperfJQL(), {
-              from_date:from_date, 
-              to_date:to_date,
-              types: labels,
-              thresholds: thresholds,
-              project_id: project_id,
-            }
-        ).done( function(results) {
-          qperfResults = results;
-          qperfResultsByProject = _.reduce(qperfResults, function (memo, result) {
+          from_date:from_date, 
+          to_date:to_date,
+          types: labels,
+          thresholds: thresholds,
+          project_id: project_id,
+        }).done( function(results) {
+          qperfResults = _.filter(results, function () { return Math.random() < 0.01 });
+          qperfResultsByProject = _.reduce(results, function (memo, result) {
             memo[result[4]] = memo[result[4]] || [];
             memo[result[4]].push(result); 
             return memo;
           }, {});
-          createQperfScatter();
-          createCustomerGrid();
+          updateQperfScatter();
+          updateCustomerGrid();
         });
       }
-      
-      
-        
     </script>
   </body>
 </html>
