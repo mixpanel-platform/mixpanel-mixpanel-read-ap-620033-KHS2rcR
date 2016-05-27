@@ -9,9 +9,11 @@
   </head>
   <body class="mixpanel-platform-body">
     <div id="date-picker"></div>
+    <h1>Queries for <span id="current-project">all projects</span></h1>
+    <a id="show-all" href="" style="display:none;">show all</a>
     <div id="query-times"></div>
-    <a id="showall" href="">show all</a>
-    <br/>
+    
+    <h1>Top 500 customers</h1>
     Filter by:
     <input id="filter" type=text/>
     <br/>
@@ -26,6 +28,15 @@
     </ul>
     
     <div id="customers"></div>
+    
+    <div class="tooltip" id="tooltip">
+      <ul>
+          <li id="tt-name"></li>
+          <li>ID: <span id="tt-id"></span></li>
+          <li>Queries: <span id="tt-queries"></span></li>
+          <li>Score: <span id="tt-score"></span></li>
+        </ul>
+      </div>
 
     <style>
       body.mixpanel-platform-body {
@@ -39,11 +50,18 @@
         list-style-type: none;
         padding-right: 5px;
       }
+      h1 {
+        color: #747d94;
+        font-size: 16pt;
+      }
       .axis path,
       .axis line {
         fill: none;
-        stroke: #000;
+        stroke: #868ea3;
         shape-rendering: crispEdges;
+      }
+      .axis text {
+        fill: #868ea3;
       }
       .axis .label {
         cursor: pointer;
@@ -70,13 +88,14 @@
         'segmentation': {m: 2.0e-9, c: 1.0},
         'retention': {m: 5e-9, c: 1.0}, 
         'events/properties': {m: 0, c: 1.0}, 
-        'events/names': {m: 0, c: 1.0}, 
-        'events': {m: 0, c: 1.0},
+        'events/names': {m: 0, c: 0.98}, 
+        'events': {m: 0, c: 1.02},
         'timeout': {m: 0, c: 120.0},
       };
-      var labels = _.keys(thresholds).sort();
-      var labelFilter = labels.slice(0);
-      var color = d3.scale.category10().domain(labels);
+      var types = _.keys(thresholds).sort();
+      var typeFilter = types.slice(0);
+      var color = d3.scale.category10().domain(types)
+      //.range(['#53A3EB', '#32bbbd', '#927eb7', '#2bb5e2', '#e8bc66', '#d390b6', '#a0a7d6']);
       var qperfResults = []; // the results of all the queries.
       var qperfResultsByProject = {};
       var topProjects = []; // the people data for the top 500 projects
@@ -102,7 +121,7 @@
           to_date = dateRange.to.toISOString().slice(0,10);
           refresh();
       }).val({from: new Date(), to:new Date()});
-      $('#showall').on('click', function(event) { 
+      $('#show-all').on('click', function(event) { 
         event.preventDefault();
         currentProject = undefined;
         updateQperfScatter();
@@ -129,7 +148,7 @@
                   && tup.event.properties.num_days != undefined
                   && (params.project_id == undefined || tup.event.properties['project id'] == params.project_id)
                   && params.types.indexOf(tup.event.properties.endpoint) != -1
-                  //&& Math.random() < 0.05; //sampling for debug
+                  && Math.random() < 0.005; //sampling for debug
                 })
                 .map(function (tup){
                   var threshold = params.thresholds[tup.event.properties.endpoint];
@@ -209,7 +228,7 @@
             .on("click", function () {ylog = !ylog; updateQperfScatter(currentProject);});
             
         var legend = query_times.selectAll(".legend")
-          .data(color.domain())
+          .data(types)
         .enter().append("g")
           .attr("class", "legend")
           .attr("transform", function(d, i) { return trans(0, i * 20); });
@@ -218,7 +237,13 @@
           .attr("x", width - 18)
           .attr("width", 18)
           .attr("height", 18)
-          .style("fill", color);
+          .style("fill", color)
+          .on("click", function (d) { 
+            var i = typeFilter.indexOf(d); 
+            if (i == -1) { typeFilter.push(d) }
+            else { typeFilter.splice(i, 1); }
+            updateQperfScatter();
+          });
       
         legend.append("text")
           .attr("x", width - 24)
@@ -229,11 +254,20 @@
       }
       
       function updateQperfScatter() {
+        $("#current-project").text(currentProject == undefined ? "all projects" : "project " + currentProject);
+        $("#show-all").toggle(currentProject != undefined);
+        
         var data = (currentProject == undefined) ? qperfResults : (qperfResultsByProject[currentProject] || []);
+        data = _.filter(data, function (d) { return typeFilter.indexOf(types[d[2]]) != -1; });
+
+        if (data.length > 20000) {
+          factor = 20000 / data.length;
+          data = _.filter(data, function () { return Math.random() < factor });
+        }
         
         var s = d3.scale.linear()
           .domain([0, 20000])
-          .range([3, 0.5])
+          .range([3, 1])
           .clamp(true);
         var dot_size = s(data.length)
           
@@ -267,11 +301,11 @@
             .attr("r", dot_size + "px")
             .attr("cx", function(d) { return x(d[1]); })
             .attr("cy", function(d) { return y(d[0]); })
-            .style("fill", function(d) { return color(labels[d[2]]); });
+            .style("fill", function(d) { return color(types[d[2]]); });
         
         query_times.selectAll(".threshold").remove();
         query_times.selectAll(".threshold")
-          .data(labels)
+          .data(types)
         .enter().append("path")
           .attr("class", "threshold")
           .style("stroke", function(d) { return color(d); })
@@ -280,6 +314,10 @@
               return xx + "," + y(thresholds[d].m * x.invert(xx) + thresholds[d].c);
             }).join("L");
           });
+          
+          query_times.selectAll(".legend").select("rect")
+          .style("opacity", function (d) {return typeFilter.indexOf(d) == -1 ? 0.2 : 1;})
+          
       }
       
       function createCustomerGrid(sort) {
@@ -314,7 +352,7 @@
         });
         data = _.sortBy(data, sorts[sort]);
 
-        var greenToRed = d3.scale.linear().domain([0, 0.33, 0.67, 1]).range(["green", "yellow", "orange", "red"]);
+        var greenToRed = d3.scale.linear().domain([0, 0.5, 1]).range(["#87E869", "#FFE58E", "#E86B48"]);
         function dsatColor(score) { return score == -1 ? "#CCC" : greenToRed(score) }
         
         var box = [60, 20];
@@ -351,11 +389,11 @@
         MP.api.jql( getQperfJQL(), {
           from_date:from_date, 
           to_date:to_date,
-          types: labels,
+          types: types,
           thresholds: thresholds,
           project_id: project_id,
         }).done( function(results) {
-          qperfResults = _.filter(results, function () { return Math.random() < 0.01 });
+          qperfResults = results;
           qperfResultsByProject = _.reduce(results, function (memo, result) {
             memo[result[4]] = memo[result[4]] || [];
             memo[result[4]].push(result); 
