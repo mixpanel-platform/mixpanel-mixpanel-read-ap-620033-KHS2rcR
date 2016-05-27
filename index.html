@@ -10,10 +10,10 @@
   <body class="mixpanel-platform-body">
     <div id="date-picker"></div>
     <h1>Queries for <span id="current-project">all projects</span></h1>
-    <a id="show-all" href="" style="display:none;">show all</a>
+    <a id="show-all" href="">show all</a>
     <div id="query-times"></div>
     
-    <h1>Top 500 customers</h1>
+    <h1>Top 200 customers</h1>
     Filter by:
     <input id="filter" type=text/>
     <br/>
@@ -29,16 +29,21 @@
     
     <div id="customers"></div>
     
-    <div class="tooltip" id="tooltip">
+    <div id="tooltip">
       <ul>
-          <li id="tt-name"></li>
+          <li><span id="tt-name"></span></li>
           <li>ID: <span id="tt-id"></span></li>
+          <li>People: <span id="tt-people"></span></li>
+          <li>Events: <span id="tt-events"></span></li>
           <li>Queries: <span id="tt-queries"></span></li>
           <li>Score: <span id="tt-score"></span></li>
         </ul>
       </div>
 
     <style>
+      body {
+        color: #747d94;
+      }
       body.mixpanel-platform-body {
         background:white;
       }
@@ -60,7 +65,7 @@
         stroke: #868ea3;
         shape-rendering: crispEdges;
       }
-      .axis text {
+      text {
         fill: #868ea3;
       }
       .axis .label {
@@ -76,6 +81,23 @@
       .customer text {
         fill: #000;
         pointer-events: none;
+      }
+      #tooltip {
+        display:block;
+        visibility:hidden;
+        position: absolute;
+        width: 140px;
+        line-height: 20px;
+        padding: 10px;
+        font-size: 14px;
+        text-align: left;
+        background: rgb(255, 255, 255);
+        border: 1px solid #EEE;
+        border-radius: 5px;
+        box-shadow: 0 2px 9px 0 rgba(0,0,0,0.15);
+      }
+      #show-all {
+        visibility:hidden;
       }
     </style>
     <script>
@@ -94,11 +116,11 @@
       };
       var types = _.keys(thresholds).sort();
       var typeFilter = types.slice(0);
-      var color = d3.scale.category10().domain(types)
+      var color = d3.scale.ordinal().domain(types).range(["#8dd3c7","#bebada","#fb8072","#80b1d3","#fdb462","#b3de69","#fccde5"]);
       //.range(['#53A3EB', '#32bbbd', '#927eb7', '#2bb5e2', '#e8bc66', '#d390b6', '#a0a7d6']);
       var qperfResults = []; // the results of all the queries.
       var qperfResultsByProject = {};
-      var topProjects = []; // the people data for the top 500 projects
+      var topProjects = []; // the people data for the top N projects
       var projectFilter = "";
       var from_date;
       var to_date;
@@ -106,13 +128,14 @@
       var ylog = true;
       var currentProject;
       
+      var tooltip = d3.select("#tooltip");
       var margin = {top: 20, right: 20, bottom: 45, left: 60},
-          width = 960 - margin.left - margin.right,
+          width = 945 - margin.left - margin.right,
           height = 550 - margin.top - margin.bottom;
       createQperfScatter();
       createCustomerGrid();
       
-      MP.api.people({where: 'properties["rank"] <= 500'}).done(function(records) {
+      MP.api.people({where: 'properties["rank"] <= 200'}).done(function(records) {
         topProjects = _.values(records.values().results);
       });
       
@@ -144,11 +167,11 @@
                 .filter(function(tup) { 
                   return tup.event != undefined
                   && tup.user != undefined
-                  && tup.user.properties.rank <= 500
+                  && tup.user.properties.rank <= 200
                   && tup.event.properties.num_days != undefined
                   && (params.project_id == undefined || tup.event.properties['project id'] == params.project_id)
                   && params.types.indexOf(tup.event.properties.endpoint) != -1
-                  && Math.random() < 0.005; //sampling for debug
+                  //&& Math.random() < 0.005; //sampling for debug
                 })
                 .map(function (tup){
                   var threshold = params.thresholds[tup.event.properties.endpoint];
@@ -254,8 +277,8 @@
       }
       
       function updateQperfScatter() {
-        $("#current-project").text(currentProject == undefined ? "all projects" : "project " + currentProject);
-        $("#show-all").toggle(currentProject != undefined);
+        d3.select("#current-project").text(currentProject == undefined ? "all projects" : "project " + currentProject);
+        d3.select("#show-all").style("visibility", currentProject != undefined ? "visible" : "hidden");
         
         var data = (currentProject == undefined) ? qperfResults : (qperfResultsByProject[currentProject] || []);
         data = _.filter(data, function (d) { return typeFilter.indexOf(types[d[2]]) != -1; });
@@ -325,7 +348,7 @@
         .attr("width", width + margin.left + margin.right)
         .attr("height", height + margin.top + margin.bottom)
         .append("g")
-        .attr("transform", trans(margin.left, margin.top));
+        //.attr("transform", trans(margin.left, margin.top));
       }
       
       function updateCustomerGrid(sort) {
@@ -352,11 +375,11 @@
         });
         data = _.sortBy(data, sorts[sort]);
 
-        var greenToRed = d3.scale.linear().domain([0, 0.5, 1]).range(["#87E869", "#FFE58E", "#E86B48"]);
+        var greenToRed = d3.scale.linear().domain([1, 0.66, 0.33, 0]).range(["#d7191c","#fdae61","#a6d96a","#1a9641"]);
         function dsatColor(score) { return score == -1 ? "#CCC" : greenToRed(score) }
         
         var box = [60, 20];
-        var cols = Math.floor(width / box[0]);
+        var cols = Math.floor((width + margin.left + margin.right) / box[0]);
         var rows = Math.ceil(data.length / cols);
         d3.select("#customers svg").attr('height', rows * box[1] + margin.top + margin.bottom);
         
@@ -367,21 +390,29 @@
           .append("g")
           .attr("class", "customer")
           .on("click", function (d) {currentProject = d['$distinct_id']; updateQperfScatter();})
-          .on('mouseover', function (d) {})
-          .on('mouseout', function (d) {});
+          .on("mouseover", function(d){
+            tooltip.style("visibility", "visible")
+            .style("top", (event.pageY-10)+"px")
+            .style("left",(event.pageX+10)+"px");
+            tooltip.select("#tt-id").text(d['$distinct_id']);
+            tooltip.select("#tt-name").text(d['$properties']['$name']);
+            tooltip.select("#tt-queries").text((qperfResultsByProject[d['$distinct_id']] || []).length);
+            tooltip.select("#tt-score").text(dsatScore(d['$distinct_id']).toFixed(2));
+          })
+          .on("mouseout", function(){return tooltip.style("visibility", "hidden");});
+
         tile.append("rect")
           .attr("width", box[0] - 2)
           .attr("height", box[1] - 2);
         tile.append("text")
           .attr("transform", trans(2,11))
-          .text(function (d) { return d['$properties']['$name']; });
+          .text(function (d) { return d['$properties']['$name'] ? d['$properties']['$name'].substr(0,7) : ""; });
           
         // Enter + Update
         tiles.transition().attr("transform", function (d,i){
           return trans((i % cols) * box[0], Math.floor(i / cols) * box[1]);
         });
         tiles.select("rect").style("fill", function (d) { return dsatColor(dsatScore(d['$distinct_id']));});
-        
         tiles.exit().remove();
       }
       
