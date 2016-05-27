@@ -105,7 +105,7 @@
       // thresholds are linear in the form y = mx + c
       // where x is the date-range adjusted tally, and y
       // is the query duration in seconds
-      var thresholds = {
+      /*var thresholds = {
         'funnels': {m: 3.0e-9, c: 1.0},
         'segmentation': {m: 2.0e-9, c: 1.0},
         'retention': {m: 2e-8, c: 1.0}, 
@@ -113,6 +113,15 @@
         'events/names': {m: 0, c: 0.98}, 
         'events': {m: 0, c: 1.02},
         'timeout': {m: 0, c: 120.0},
+      };*/
+      var thresholds = {
+        'funnels': {m: 0, c: 2.0},
+        'segmentation': {m: 0, c: 2.0},
+        'retention': {m: 0, c: 2.0}, 
+        'events/properties': {m: 0, c: 2.0}, 
+        'events/names': {m: 0, c: 2}, 
+        'events': {m: 0, c: 2},
+        'timeout': {m: 0, c: 2},
       };
       var types = _.keys(thresholds).sort();
       var typeFilter = types.slice(0);
