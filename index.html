@@ -106,7 +106,7 @@
       // where x is the date-range adjusted tally, and y
       // is the query duration in seconds
       var thresholds = {
-        'funnels': {m: 1.0e-9, c: 1.0},
+        'funnels': {m: 3.0e-9, c: 1.0},
         'segmentation': {m: 2.0e-9, c: 1.0},
         'retention': {m: 5e-9, c: 1.0}, 
         'events/properties': {m: 0, c: 1.0}, 
@@ -169,17 +169,21 @@
                   && tup.user != undefined
                   && tup.user.properties.rank <= 200
                   && tup.event.properties.num_days != undefined
+                  //&& tup.event.properties.from_date != undefined
+                  //&& tup.event.properties.to_date != undefined
                   && (params.project_id == undefined || tup.event.properties['project id'] == params.project_id)
                   && params.types.indexOf(tup.event.properties.endpoint) != -1
-                  //&& Math.random() < 0.005; //sampling for debug
+                  //&& Math.random() < 0.001; //sampling for debug
                 })
                 .map(function (tup){
                   var threshold = params.thresholds[tup.event.properties.endpoint];
                   var elapsed = tup.event.properties.elapsed / 1000;
-                  var tally = tup.user.properties.events_tally * (tup.event.properties.num_days / 31.0);
+                  var num_days = tup.event.properties.num_days;
+                  //var num_days = Math.max(1, (new Date(tup.event.properties.to_date) - new Date(tup.event.properties.from_date)) / 86400000);
+                  var tally = tup.user.properties.events_tally * (num_days / 31.0);
                   var type_index = params.types.indexOf(tup.event.properties.endpoint);
                   var slow = elapsed > ((threshold.m * tally) + threshold.c) ? 1 : 0;
-                  return [elapsed, tally, type_index, slow, tup.event.properties['project id']];
+                  return [elapsed, tally, type_index, slow, tup.event.properties['project id'], num_days];
                 });
             };
       }
@@ -350,13 +354,12 @@
         .append("g")
         //.attr("transform", trans(margin.left, margin.top));
       }
-      
-      function updateCustomerGrid(sort) {
-        function dsatScore(project_id) {
-          var counts = qperfResultsByProject[project_id] || [];
-          return counts.length == 0 ? -1 : _.filter(counts, function (q) {return q[3] == 1;}).length / counts.length;
-        }
+      function dsatScore(project_id) {
+        var counts = qperfResultsByProject[project_id] || [];
+        return counts.length == 0 ? -1 : _.filter(counts, function (q) {return q[3] == 1;}).length / counts.length;
+      }
         
+      function updateCustomerGrid(sort) {
         sort = sort || 'rank';
         var sorts = {
           'rank': function (r) {return r['$properties']['rank'];},
@@ -397,7 +400,7 @@
             tooltip.select("#tt-id").text(d['$distinct_id']);
             tooltip.select("#tt-name").text(d['$properties']['$name']);
             tooltip.select("#tt-queries").text((qperfResultsByProject[d['$distinct_id']] || []).length);
-            tooltip.select("#tt-score").text(dsatScore(d['$distinct_id']).toFixed(2));
+            tooltip.select("#tt-score").text(dsatScore(d['$distinct_id']).toFixed(4));
           })
           .on("mouseout", function(){return tooltip.style("visibility", "hidden");});
 
