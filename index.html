@@ -108,9 +108,7 @@
       var thresholds = {
         'funnels': {m: 3.0e-9, c: 1.0},
         'segmentation': {m: 2.0e-9, c: 1.0},
-        'retention': {m: 2e-8, c: 1.0}, 
-        'events/properties': {m: 0, c: 1.0}, 
-        'events/names': {m: 0, c: 0.98}, 
+        'retention': {m: 2e-8, c: 1.0},
         'events': {m: 0, c: 1.02},
         'timeout': {m: 0, c: 120.0},
       };
@@ -171,16 +169,16 @@
                   //&& tup.event.properties.from_date != undefined
                   //&& tup.event.properties.to_date != undefined
                   && (params.project_id == undefined || tup.event.properties['project id'] == params.project_id)
-                  && params.types.indexOf(tup.event.properties.endpoint) != -1
+                  && params.types.indexOf(tup.event.properties['api name']) != -1
                   //&& Math.random() < 0.001; //sampling for debug
                 })
                 .map(function (tup){
-                  var threshold = params.thresholds[tup.event.properties.endpoint];
+                  var threshold = params.thresholds[tup.event.properties['api name']];
                   var elapsed = tup.event.properties.elapsed / 1000;
                   var num_days = tup.event.properties.num_days;
                   //var num_days = Math.max(1, (new Date(tup.event.properties.to_date) - new Date(tup.event.properties.from_date)) / 86400000);
                   var tally = tup.user.properties.events_tally * (num_days / 31.0);
-                  var type_index = params.types.indexOf(tup.event.properties.endpoint);
+                  var type_index = params.types.indexOf(tup.event.properties['api name']);
                   var slow = elapsed > ((threshold.m * tally) + threshold.c) ? 1 : 0;
                   return [elapsed, tally, type_index, slow, tup.event.properties['project id'], num_days];
                 });
@@ -197,7 +195,7 @@
                   && tup.user != undefined
                   && tup.event.properties.num_days != undefined
                   && (params.project_id == undefined || tup.event.properties['project id'] == params.project_id)
-                  && params.types.indexOf(tup.event.properties.endpoint) != -1
+                  && params.types.indexOf(tup.event.properties['api name']) != -1
                 })
                 .reduce(function (accumulators, tuples){
                   var result = {};
@@ -211,7 +209,7 @@
                   for (var t in tuples) {
                     var tup = tuples[t];
                     var k = new Date(tup.event.time).toISOString().slice(0,10);
-                    var threshold = params.thresholds[tup.event.properties.endpoint];
+                    var threshold = params.thresholds[tup.event.properties['api name']];
                     var elapsed = tup.event.properties.elapsed / 1000;
                     var tally = tup.user.properties.events_tally * (tup.event.properties.num_days / 31.0);
                     var slow = elapsed > ((threshold.m * tally) + threshold.c) ? 1 : 0;
