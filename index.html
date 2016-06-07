@@ -8,7 +8,10 @@
     <script src="//d3js.org/d3.v3.min.js"></script>
   </head>
   <body class="mixpanel-platform-body">
-    <div id="date-picker"></div>
+    <div id="select">
+      <div id="date-picker"></div>
+      <img id="loader" src="//cdn.mxpnl.com/cache/ce8bc8140ad948c8566af9a3963e1e25/images/ajax/ajax-loader-big.gif"/>
+    </div>
     <h1>Queries for <span id="current-project">all projects</span></h1>
     <a id="show-all" href="">show all</a>
     <div id="query-times"></div>
@@ -96,8 +99,11 @@
         border-radius: 5px;
         box-shadow: 0 2px 9px 0 rgba(0,0,0,0.15);
       }
-      #show-all {
+      #show-all, #loader {
         visibility:hidden;
+      }
+      #date-picker {
+        float:left;
       }
     </style>
     <script>
@@ -417,6 +423,7 @@
       }
       
       function refresh(project_id) {
+        d3.select("#loader").style("visibility", "visible")
         MP.api.jql( getQperfJQL(), {
           from_date:from_date, 
           to_date:to_date,
@@ -432,6 +439,7 @@
           }, {});
           updateQperfScatter();
           updateCustomerGrid();
+          d3.select("#loader").style("visibility", "hidden")
         });
       }
     </script>
