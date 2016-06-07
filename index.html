@@ -314,8 +314,8 @@
         var query_times = d3.select("#query-times svg g");
         query_times.select(".y.axis").call(yAxis);
         query_times.select(".x.axis").call(xAxis);
-        query_times.select(".x.axis label").text("events queried" + (xlog ? " (log)" : ""));
-        query_times.select(".y.axis label").text("seconds elapsed" + (ylog ? " (log)" : ""));
+        query_times.select(".x.axis .label").text("events queried" + (xlog ? " (log)" : ""));
+        query_times.select(".y.axis .label").text("seconds elapsed" + (ylog ? " (log)" : ""));
         
         query_times.selectAll(".dot").remove();
         query_times.selectAll(".dot")
