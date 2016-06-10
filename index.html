@@ -146,8 +146,8 @@
       });
       
       $('#date-picker').MPDatepicker().on('change', function(event, dateRange) {
-          from_date = dateRange.from.toISOString().slice(0,10);
-          to_date = dateRange.to.toISOString().slice(0,10);
+          from_date = dateRange.from;
+          to_date = dateRange.to;
           refreshQueries();
       }).val({from: new Date(), to:new Date()});
       $('#show-all').on('click', function(event) { 
@@ -230,7 +230,7 @@
                 })
                 .map(function(r) {
                   _.each(r, function(v, k){
-                    r[1] / (r[0] + r[1]); 
+                    r[k] = v[1] / (v[0] + v[1]); 
                   });
                   return r;
                 });
@@ -443,8 +443,8 @@
       function refreshQueries(project_id) {
         d3.select("#loader").style("visibility", "visible")
         MP.api.jql( getQperfJQL(), {
-          from_date:from_date, 
-          to_date:to_date,
+          from_date:from_date.toISOString().slice(0,10), 
+          to_date:to_date.toISOString().slice(0,10),
           types: types,
           thresholds: thresholds,
           project_id: project_id,
@@ -463,8 +463,8 @@
       
       function refreshHistory() {
         MP.api.jql( getDstatHistoryJQL(), {
-          from_date:from_date, 
-          to_date:to_date,
+          from_date:new Date(from_date - 5 * 86400000).toISOString().slice(0,10), 
+          to_date:to_date.toISOString().slice(0,10),
           types: types,
           thresholds: thresholds,
           project_id: currentProject,
