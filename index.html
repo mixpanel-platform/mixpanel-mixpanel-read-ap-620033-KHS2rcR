@@ -141,14 +141,14 @@
       createQperfScatter();
       createCustomerGrid();
       
-      MP.api.people({where: 'properties["rank"] <= 200 and properties["$last_seen"] > datetime(NOW - 7200)'}).done(function(records) {
+      MP.api.people({where: 'properties["rank"] <= 200 and properties["$last_seen"] > datetime(NOW - 86400)'}).done(function(records) {
         topProjects = _.values(records.values().results);
       });
       
       $('#date-picker').MPDatepicker().on('change', function(event, dateRange) {
           from_date = dateRange.from.toISOString().slice(0,10);
           to_date = dateRange.to.toISOString().slice(0,10);
-          refresh();
+          refreshQueries();
       }).val({from: new Date(), to:new Date()});
       $('#show-all').on('click', function(event) { 
         event.preventDefault();
@@ -180,7 +180,7 @@
                   //&& tup.event.properties.to_date != undefined
                   && (params.project_id == undefined || tup.event.properties['project id'] == params.project_id)
                   && params.types.indexOf(tup.event.properties['api name']) != -1
-                  && Math.random() < 0.1; //sampling for debug
+                  && Math.random() < 0.001; //sampling for debug
                 })
                 .map(function (tup){
                   var threshold = params.thresholds[tup.event.properties['api name']];
@@ -227,6 +227,12 @@
                     result[k][slow] += 1;
                   }
                   return result;
+                })
+                .map(function(r) {
+                  _.each(r, function(v, k){
+                    r[1] / (r[0] + r[1]); 
+                  });
+                  return r;
                 });
             };
       };
@@ -246,7 +252,7 @@
             .attr("x", width/2)
             .attr("y", 40)
             .style("text-anchor", "middle")
-            .on("click", function () {xlog = !xlog; updateQperfScatter(currentProject);});
+            .on("click", function () {xlog = !xlog; updateQperfScatter();});
           
         query_times.append("g")
             .attr("class", "y axis")
@@ -257,7 +263,7 @@
             .attr("y", -50)
             .attr("x", -height/2)
             .style("text-anchor", "middle")
-            .on("click", function () {ylog = !ylog; updateQperfScatter(currentProject);});
+            .on("click", function () {ylog = !ylog; updateQperfScatter();});
             
         var legend = query_times.selectAll(".legend")
           .data(types)
@@ -400,7 +406,11 @@
         var tile = tiles.enter()
           .append("g")
           .attr("class", "customer")
-          .on("click", function (d) {currentProject = d['$distinct_id']; updateQperfScatter();})
+          .on("click", function (d) {
+            currentProject = d['$distinct_id']; 
+            updateQperfScatter();
+            refreshHistory();
+          })
           .on("mouseover", function(d){
             tooltip.style("visibility", "visible")
             .style("top", (event.pageY-10)+"px")
@@ -430,7 +440,7 @@
         tiles.exit().remove();
       }
       
-      function refresh(project_id) {
+      function refreshQueries(project_id) {
         d3.select("#loader").style("visibility", "visible")
         MP.api.jql( getQperfJQL(), {
           from_date:from_date, 
@@ -448,6 +458,20 @@
           updateQperfScatter();
           updateCustomerGrid();
           d3.select("#loader").style("visibility", "hidden")
+        });
+      }
+      
+      function refreshHistory() {
+        MP.api.jql( getDstatHistoryJQL(), {
+          from_date:from_date, 
+          to_date:to_date,
+          types: types,
+          thresholds: thresholds,
+          project_id: currentProject,
+        }).done( function(results) {
+          console.log(results);
+          
+          $('#score-history').MPChart('setData', results);
         });
       }
     </script>
