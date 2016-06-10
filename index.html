@@ -152,8 +152,6 @@
       createClusterGrid();
       createTooltip();
       
-
-      
       $('#date-picker').MPDatepicker().on('change', function(event, dateRange) {
           from_date = dateRange.from;
           to_date = dateRange.to;
@@ -192,7 +190,7 @@
                   //&& tup.event.properties.to_date != undefined
                   && (params.project_id == undefined || tup.event.properties['project id'] == params.project_id)
                   && params.types.indexOf(tup.event.properties['api name']) != -1
-                  && Math.random() < 0.5; //sampling for debug
+                  //&& Math.random() < 0.5; //sampling for debug
                 })
                 .map(function (tup){
                   var threshold = params.thresholds[tup.event.properties['api name']];
@@ -492,10 +490,7 @@
       }
       
       function createTooltip() {
-        d3.select("#tt-history").append("svg")
-        .attr("width", 100)
-        .attr("height", 100)
-        .append("g");
+        //d3.select("#tt-history").append("svg").attr("width", 100).attr("height", 100).append("g");
       }
       
       function updateTooltip(d, event) {
@@ -528,10 +523,7 @@
             return [
               project[0],
               _.object(_.map(_.pairs(project[1]), function(date){
-                return [
-                  date[0], 
-                  parseFloat((date[1][1] / (date[1][0] + date[1][1])).toFixed(2))
-                ]; 
+                return [date[0], parseFloat((date[1][1] / (date[1][0] + date[1][1])).toFixed(2))]; 
               }))
             ];
           }));
@@ -571,7 +563,7 @@
         });
         // get the query success history per project
         MP.api.jql( getDstatHistoryJQL(), {
-          from_date:new Date(from_date - 5 * 86400000).toISOString().slice(0,10), 
+          from_date:new Date(from_date - 10 * 86400000).toISOString().slice(0,10), 
           to_date:to_date.toISOString().slice(0,10),
           types: types,
           thresholds: thresholds,
