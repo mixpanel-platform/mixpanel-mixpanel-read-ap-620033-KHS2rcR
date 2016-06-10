@@ -90,7 +90,7 @@
         stroke-width: 1;
         fill: none;
       }
-      svg text {
+      .customer text, .cluster text {
         fill: #000;
         pointer-events: none;
       }
@@ -163,6 +163,7 @@
         event.preventDefault();
         currentProject = undefined;
         updateQperfScatter();
+        updateScoreHistoryChart();
       });
       $('#sorts li a').on('click', function(event) { 
         event.preventDefault();
@@ -432,6 +433,7 @@
           .on("click", function (d) {
             currentProject = d['$distinct_id']; 
             updateQperfScatter();
+            updateScoreHistoryChart();
           })
           .on("mouseover", function(d){
             d3.select("#tooltip").style("visibility", "visible")
@@ -518,7 +520,11 @@
       }
       
       function updateScoreHistoryChart(sort) {
-        var qPerfScoresByProject = _.object(_.map(_.pairs(qPerfHistoryByProject), function(project) {
+        var data = _.pick(qPerfHistoryByProject, function(scores, project) {
+          return currentProject == undefined || project == currentProject;
+        });
+        //calculate scores (why can't we use mapObject)
+        data = _.object(_.map(_.pairs(data), function(project) {
             return [
               project[0],
               _.object(_.map(_.pairs(project[1]), function(date){
@@ -529,7 +535,7 @@
               }))
             ];
           }));
-          $('#score-history').MPChart('setData', qPerfScoresByProject);
+          $('#score-history').MPChart('setData', data);
       }
       
       function refresh(project_id) {
