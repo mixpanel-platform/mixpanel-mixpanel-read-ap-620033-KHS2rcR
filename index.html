@@ -47,7 +47,9 @@
         <li>Queries: <span id="tt-queries"></span></li>
         <li>Score: <span id="tt-score"></span></li>
         <li>Cluster: <span id="tt-cluster"></span></li>
+        <li>History: <div class="tt-history"></div></li>
       </ul>
+      
     </div>
 
     <style>
@@ -426,17 +428,9 @@
           })
           .on("mouseover", function(d){
             tooltip.style("visibility", "visible")
-            .style("top", (event.pageY-10)+"px")
-            .style("left",(event.pageX+10)+"px");
-            tooltip.select("#tt-id").text(d['$distinct_id']);
-            tooltip.select("#tt-name").text(d['$properties']['$name']);
-            tooltip.select("#tt-events").text(d['$properties']['events_tally']);
-            tooltip.select("#tt-people").text(d['$properties']['people_tally']);
-            tooltip.select("#tt-queries").text((qperfResultsByProject[d['$distinct_id']] || []).length);
-            tooltip.select("#tt-score").text(dsatScore(d['$distinct_id']).toFixed(4));
-            tooltip.select("#tt-cluster").text(d['$properties']['cluster_id']);
+            updateCustomerTooltip(d, event);
           })
-          .on("mouseout", function(){return tooltip.style("visibility", "hidden");});
+          .on("mouseout", function(){ tooltip.style("visibility", "hidden");});
 
         tile.append("rect")
           .attr("width", box[0] - 2)
@@ -451,6 +445,18 @@
         });
         tiles.select("rect").style("fill", function (d) { return dsatColor(dsatScore(d['$distinct_id']));});
         tiles.exit().remove();
+      }
+      
+      function updateCustomerTooltip(d, event) {
+        tooltip.style("top", (event.pageY-10)+"px")
+          .style("left",(event.pageX+10)+"px");
+          tooltip.select("#tt-id").text(d['$distinct_id']);
+          tooltip.select("#tt-name").text(d['$properties']['$name']);
+          tooltip.select("#tt-events").text(d['$properties']['events_tally']);
+          tooltip.select("#tt-people").text(d['$properties']['people_tally']);
+          tooltip.select("#tt-queries").text((qperfResultsByProject[d['$distinct_id']] || []).length);
+          tooltip.select("#tt-score").text(dsatScore(d['$distinct_id']).toFixed(4));
+          tooltip.select("#tt-cluster").text(d['$properties']['cluster_id']);
       }
       
       function updateScoreHistoryChart(sort) {
