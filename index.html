@@ -141,7 +141,7 @@
       createQperfScatter();
       createCustomerGrid();
       
-      MP.api.people({where: 'properties["rank"] <= 200'}).done(function(records) {
+      MP.api.people({where: 'properties["rank"] <= 200 and properties["$last_seen"] > datetime(NOW - 7200)'}).done(function(records) {
         topProjects = _.values(records.values().results);
       });
       
@@ -170,7 +170,7 @@
             return join(Events({from_date: params.from_date, to_date: params.to_date, 
                                 event_selectors:[{event: "API request"}]}), 
                         People())
-                .filter(function(tup) { 
+                .filter(function(tup) {
                   return tup.event != undefined
                   && tup.user != undefined
                   && tup.user.properties.rank <= 200
