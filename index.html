@@ -30,20 +30,25 @@
       <li><a href="">score</a></li>
       <li><a href="">cluster</a></li>
     </ul>
-    
     <div id="customers"></div>
+    
+    <h1>Clusters</h1>
+    <div id="clusters"></div>
+    
+    <h1>Score History</h1>
     <div id="score-history"></div>
+    
     <div id="tooltip">
       <ul>
-          <li><span id="tt-name"></span></li>
-          <li>ID: <span id="tt-id"></span></li>
-          <li>People: <span id="tt-people"></span></li>
-          <li>Events: <span id="tt-events"></span></li>
-          <li>Queries: <span id="tt-queries"></span></li>
-          <li>Score: <span id="tt-score"></span></li>
-          <li>Cluster: <span id="tt-cluster"></span></li>
-        </ul>
-      </div>
+        <li><span id="tt-name"></span></li>
+        <li>ID: <span id="tt-id"></span></li>
+        <li>People: <span id="tt-people"></span></li>
+        <li>Events: <span id="tt-events"></span></li>
+        <li>Queries: <span id="tt-queries"></span></li>
+        <li>Score: <span id="tt-score"></span></li>
+        <li>Cluster: <span id="tt-cluster"></span></li>
+      </ul>
+    </div>
 
     <style>
       body {
@@ -127,6 +132,7 @@
                                                           "#80b1d3","#fdb462","#b3de69","#fccde5"]);
       var qperfResults = []; // the results of all the queries.
       var qperfResultsByProject = {};
+      var qPerfHistoryByProject = {};
       var topProjects = []; // the people data for the top N projects
       var projectFilter = "";
       var from_date;
@@ -205,7 +211,7 @@
                 .filter(function(tup) { 
                   return tup.event != undefined
                   && tup.user != undefined
-                  && tup.user.properties.rank <= 2
+                  && tup.user.properties.rank <= 200
                   && tup.event.properties.num_days != undefined
                   && (params.project_id == undefined || tup.event.properties['project id'] == params.project_id)
                   && params.types.indexOf(tup.event.properties['api name']) != -1
@@ -225,7 +231,7 @@
                   for (var t in tuples) {
                     var tup = tuples[t];
                     var project = tup.event.properties['project id'];
-                    var date = "date";//new Date(tup.event.time).toISOString().slice(0,10);
+                    var date = new Date(tup.event.time).toISOString().slice(0,10);
                     var threshold = params.thresholds[tup.event.properties['api name']];
                     var elapsed = tup.event.properties.elapsed / 1000;
                     var tally = tup.user.properties.events_tally * (tup.event.properties.num_days / 31.0);
@@ -236,13 +242,13 @@
                   }
                   return result;
                 })
-                .map(function(r) {
-                  return _.mapObject(r, function(dates, project)) {
+                /*.map(function(r) {
+                  return _.mapObject(r, function(dates, project) {
                     return _.mapObject(dates, function(counts, date){
-                      return counts[1] / (counts[0] + counts[1]); 
+                      return parseFloat((counts[1] / (counts[0] + counts[1])).toFixed(2)); 
                     });
                   });
-                });
+                });*/
             };
       };
 
@@ -417,7 +423,6 @@
           .on("click", function (d) {
             currentProject = d['$distinct_id']; 
             updateQperfScatter();
-            refreshHistory();
           })
           .on("mouseover", function(d){
             tooltip.style("visibility", "visible")
@@ -446,6 +451,21 @@
         });
         tiles.select("rect").style("fill", function (d) { return dsatColor(dsatScore(d['$distinct_id']));});
         tiles.exit().remove();
+      }
+      
+      function updateScoreHistoryChart(sort) {
+        var qPerfScoresByProject = _.object(_.map(_.pairs(qPerfHistoryByProject), function(project) {
+            return [
+              project[0],
+              _.object(_.map(_.pairs(project[1]), function(date){
+                return [
+                  date[0], 
+                  parseFloat((date[1][1] / (date[1][0] + date[1][1])).toFixed(2))
+                ]; 
+              }))
+            ];
+          }));
+          $('#score-history').MPChart('setData', qPerfScoresByProject);
       }
       
       function refreshQueries(project_id) {
@@ -477,9 +497,8 @@
           thresholds: thresholds,
           //project_id: currentProject,
         }).done( function(results) {
-          console.log(results);
-          
-          $('#score-history').MPChart('setData', results);
+          qPerfHistoryByProject = results[0];
+          updateScoreHistoryChart();
         });
       }
     </script>
