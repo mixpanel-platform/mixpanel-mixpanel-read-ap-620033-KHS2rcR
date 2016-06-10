@@ -47,7 +47,7 @@
         <li>Queries: <span id="tt-queries"></span></li>
         <li>Score: <span id="tt-score"></span></li>
         <li>Cluster: <span id="tt-cluster"></span></li>
-        <li>History: <div class="tt-history"></div></li>
+        <li>History: <div id="tt-history"></div></li>
       </ul>
       
     </div>
@@ -90,7 +90,7 @@
         stroke-width: 1;
         fill: none;
       }
-      .customer text {
+      svg text {
         fill: #000;
         pointer-events: none;
       }
@@ -132,8 +132,10 @@
       var typeFilter = types.slice(0);
       var color = d3.scale.ordinal().domain(types).range(["#8dd3c7","#bebada","#fb8072",
                                                           "#80b1d3","#fdb462","#b3de69","#fccde5"]);
+      var greenToRed = d3.scale.linear().domain([1, 0.66, 0.33, 0, -1]).range(["#d7191c","#fdae61","#a6d96a","#1a9641", "#CCC"]);
       var qperfResults = []; // the results of all the queries.
       var qperfResultsByProject = {};
+      var qperfResultsByCluster = {};
       var qPerfHistoryByProject = {};
       var topProjects = []; // the people data for the top N projects
       var projectFilter = "";
@@ -142,23 +144,20 @@
       var xlog = true;
       var ylog = true;
       var currentProject;
-      
-      var tooltip = d3.select("#tooltip");
       var margin = {top: 20, right: 20, bottom: 45, left: 60},
           width = 945 - margin.left - margin.right,
           height = 550 - margin.top - margin.bottom;
       createQperfScatter();
       createCustomerGrid();
+      createClusterGrid();
+      createTooltip();
       
-      MP.api.people({where: 'properties["rank"] <= 200 and properties["$last_seen"] > datetime(NOW - 86400)'}).done(function(records) {
-        topProjects = _.values(records.values().results);
-      });
+
       
       $('#date-picker').MPDatepicker().on('change', function(event, dateRange) {
           from_date = dateRange.from;
           to_date = dateRange.to;
-          refreshQueries();
-          refreshHistory();
+          refresh();
       }).val({from: new Date(), to:new Date()});
       $('#show-all').on('click', function(event) { 
         event.preventDefault();
@@ -176,6 +175,8 @@
       });
       $('#score-history').MPChart({chartType: 'line', highchartsOptions: {yAxis: {min: 0, max: 1}}});
       
+      
+      
       function getQperfJQL() {
         return function main() {
             return join(Events({from_date: params.from_date, to_date: params.to_date, 
@@ -190,17 +191,24 @@
                   //&& tup.event.properties.to_date != undefined
                   && (params.project_id == undefined || tup.event.properties['project id'] == params.project_id)
                   && params.types.indexOf(tup.event.properties['api name']) != -1
-                  && Math.random() < 0.1; //sampling for debug
+                  && Math.random() < 0.5; //sampling for debug
                 })
                 .map(function (tup){
                   var threshold = params.thresholds[tup.event.properties['api name']];
-                  var elapsed = (tup.event.properties.elapsed / 1000);
+                  var elapsed = parseFloat((tup.event.properties.elapsed / 1000).toFixed(3));
                   var num_days = tup.event.properties.num_days;
-                  //var num_days = Math.max(1, (new Date(tup.event.properties.to_date) - new Date(tup.event.properties.from_date)) / 86400000);
-                  var tally = tup.user.properties.events_tally * (num_days / 31.0);
+                  var tally = parseInt((tup.user.properties.events_tally * (num_days / 31.0)).toFixed(0));
                   var type_index = params.types.indexOf(tup.event.properties['api name']);
                   var slow = elapsed > ((threshold.m * tally) + threshold.c) ? 1 : 0;
-                  return [elapsed, tally, type_index, slow, tup.event.properties['project id'], num_days];
+                  return [
+                    elapsed, 
+                    tally, 
+                    type_index, 
+                    slow, 
+                    tup.event.properties['project id'],
+                    num_days, 
+                    tup.user.properties['cluster_id']
+                  ];
                 });
             };
       }
@@ -241,16 +249,12 @@
                     result[project] = result[project] || {};
                     result[project][date] = (result[project][date] || [0,0]);
                     result[project][date][slow] += 1;
+                    result['total'] = result['total'] || {};
+                    result['total'][date] = (result['total'][date] || [0,0]);
+                    result['total'][date][slow] += 1;
                   }
                   return result;
                 })
-                /*.map(function(r) {
-                  return _.mapObject(r, function(dates, project) {
-                    return _.mapObject(dates, function(counts, date){
-                      return parseFloat((counts[1] / (counts[0] + counts[1])).toFixed(2)); 
-                    });
-                  });
-                });*/
             };
       };
 
@@ -380,11 +384,17 @@
         d3.select("#customers").append("svg")
         .attr("width", width + margin.left + margin.right)
         .attr("height", height + margin.top + margin.bottom)
-        .append("g")
+        .append("g");
         //.attr("transform", trans(margin.left, margin.top));
       }
+      
       function dsatScore(project_id) {
         var counts = qperfResultsByProject[project_id] || [];
+        return counts.length == 0 ? -1 : _.filter(counts, function (q) {return q[3] == 1;}).length / counts.length;
+      }
+      
+      function dsatScoreForCluster(cluster_id) {
+        var counts = qperfResultsByCluster[cluster_id] || [];
         return counts.length == 0 ? -1 : _.filter(counts, function (q) {return q[3] == 1;}).length / counts.length;
       }
         
@@ -407,9 +417,6 @@
             || projectFilterRegex.test(d['$distinct_id'] + "");
         });
         data = _.sortBy(data, sorts[sort]);
-
-        var greenToRed = d3.scale.linear().domain([1, 0.66, 0.33, 0]).range(["#d7191c","#fdae61","#a6d96a","#1a9641"]);
-        function dsatColor(score) { return score == -1 ? "#CCC" : greenToRed(score) }
         
         var box = [60, 20];
         var cols = Math.floor((width + margin.left + margin.right) / box[0]);
@@ -427,10 +434,10 @@
             updateQperfScatter();
           })
           .on("mouseover", function(d){
-            tooltip.style("visibility", "visible")
-            updateCustomerTooltip(d, event);
+            d3.select("#tooltip").style("visibility", "visible")
+            updateTooltip(d, event);
           })
-          .on("mouseout", function(){ tooltip.style("visibility", "hidden");});
+          .on("mouseout", function(){ d3.select("#tooltip").style("visibility", "hidden");});
 
         tile.append("rect")
           .attr("width", box[0] - 2)
@@ -443,11 +450,54 @@
         tiles.transition().attr("transform", function (d,i){
           return trans((i % cols) * box[0], Math.floor(i / cols) * box[1]);
         });
-        tiles.select("rect").style("fill", function (d) { return dsatColor(dsatScore(d['$distinct_id']));});
+        tiles.select("rect").style("fill", function (d) { return greenToRed(dsatScore(d['$distinct_id']));});
         tiles.exit().remove();
       }
       
-      function updateCustomerTooltip(d, event) {
+      function createClusterGrid() {
+        d3.select("#clusters").append("svg")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom)
+        .append("g");
+      }
+      
+      function updateClusterGrid() {
+        var data = _.pairs(qperfResultsByCluster);
+        console.log(data);
+        var box = [60, 20];
+        var cols = Math.floor((width + margin.left + margin.right) / box[0]);
+        var rows = Math.ceil(data.length / cols);
+        d3.select("#clusters svg").attr('height', rows * box[1] + margin.top + margin.bottom);
+        
+        var tiles = d3.select("#clusters svg g").selectAll(".cluster")
+          .data(data, function (d) {return d[0]});
+          
+        var tile = tiles.enter()
+          .append("g")
+          .attr("class", "cluster")
+        tile.append("rect")
+          .attr("width", box[0] - 2)
+          .attr("height", box[1] - 2);
+        tile.append("text")
+          .attr("transform", trans(2,11))
+          .text(function (d) {return d[0]})
+          
+        tiles.transition().attr("transform", function (d,i){
+          return trans((i % cols) * box[0], Math.floor(i / cols) * box[1]);
+        });
+        tiles.select("rect").style("fill", function (d) { return greenToRed(dsatScoreForCluster(d[0]));});
+        tiles.exit().remove();
+      }
+      
+      function createTooltip() {
+        d3.select("#tt-history").append("svg")
+        .attr("width", 100)
+        .attr("height", 100)
+        .append("g");
+      }
+      
+      function updateTooltip(d, event) {
+        var tooltip = d3.select("#tooltip");
         tooltip.style("top", (event.pageY-10)+"px")
           .style("left",(event.pageX+10)+"px");
           tooltip.select("#tt-id").text(d['$distinct_id']);
@@ -457,6 +507,14 @@
           tooltip.select("#tt-queries").text((qperfResultsByProject[d['$distinct_id']] || []).length);
           tooltip.select("#tt-score").text(dsatScore(d['$distinct_id']).toFixed(4));
           tooltip.select("#tt-cluster").text(d['$properties']['cluster_id']);
+          
+        /* var tiles = tooltip.select("#tt-history svg g").selectAll(".cluster")
+          .data(data, function (d) {return d['$distinct_id'];});
+          
+        var tile = tiles.enter()
+          .append("g")
+          .attr("class", "cluster")*/
+        
       }
       
       function updateScoreHistoryChart(sort) {
@@ -474,8 +532,15 @@
           $('#score-history').MPChart('setData', qPerfScoresByProject);
       }
       
-      function refreshQueries(project_id) {
+      function refresh(project_id) {
         d3.select("#loader").style("visibility", "visible")
+        //get the people data
+        MP.api.people({
+          where: 'properties["rank"] <= 200 and properties["$last_seen"] > datetime(NOW - 86400)'
+        }).done(function(records) {
+          topProjects = _.values(records.values().results);
+        });
+        // get the raw queries for the scatter
         MP.api.jql( getQperfJQL(), {
           from_date:from_date.toISOString().slice(0,10), 
           to_date:to_date.toISOString().slice(0,10),
@@ -489,13 +554,16 @@
             memo[result[4]].push(result); 
             return memo;
           }, {});
+          qperfResultsByCluster = _.reduce(results, function (memo, result) {
+            memo[result[6]] = memo[result[6]] || [];
+            memo[result[6]].push(result); 
+            return memo;
+          }, {});
           updateQperfScatter();
           updateCustomerGrid();
-          d3.select("#loader").style("visibility", "hidden")
+          updateClusterGrid();
         });
-      }
-      
-      function refreshHistory() {
+        // get the query success history per project
         MP.api.jql( getDstatHistoryJQL(), {
           from_date:new Date(from_date - 5 * 86400000).toISOString().slice(0,10), 
           to_date:to_date.toISOString().slice(0,10),
@@ -505,6 +573,7 @@
         }).done( function(results) {
           qPerfHistoryByProject = results[0];
           updateScoreHistoryChart();
+          d3.select("#loader").style("visibility", "hidden")
         });
       }
     </script>
