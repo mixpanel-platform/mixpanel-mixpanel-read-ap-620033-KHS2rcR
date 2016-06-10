@@ -28,6 +28,7 @@
       <li><a href="">events</a></li>
       <li><a href="">queries</a></li>
       <li><a href="">score</a></li>
+      <li><a href="">cluster</a></li>
     </ul>
     
     <div id="customers"></div>
@@ -405,8 +406,11 @@
             .style("left",(event.pageX+10)+"px");
             tooltip.select("#tt-id").text(d['$distinct_id']);
             tooltip.select("#tt-name").text(d['$properties']['$name']);
+            tooltip.select("#tt-events").text(d['$properties']['events_tally']);
+            tooltip.select("#tt-people").text(d['$properties']['people_tally']);
             tooltip.select("#tt-queries").text((qperfResultsByProject[d['$distinct_id']] || []).length);
             tooltip.select("#tt-score").text(dsatScore(d['$distinct_id']).toFixed(4));
+            tooltip.select("#tt-cluster").text(d['$properties']['cluster_id']);
           })
           .on("mouseout", function(){return tooltip.style("visibility", "hidden");});
 
