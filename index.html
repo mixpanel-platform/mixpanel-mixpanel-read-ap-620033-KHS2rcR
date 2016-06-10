@@ -40,6 +40,7 @@
           <li>Events: <span id="tt-events"></span></li>
           <li>Queries: <span id="tt-queries"></span></li>
           <li>Score: <span id="tt-score"></span></li>
+          <li>Cluster: <span id="tt-cluster"></span></li>
         </ul>
       </div>
 
@@ -117,6 +118,7 @@
         'retention': {m: 2e-8, c: 1.0},
         'events': {m: 0, c: 1.02},
         'timeout': {m: 0, c: 120.0},
+        'engage': {m: 0, c: 1.00},
       };
       var types = _.keys(thresholds).sort();
       var typeFilter = types.slice(0);
@@ -371,6 +373,7 @@
           'events': function (r) {return -r['$properties']['events_tally'];},
           'queries': function (r) {return -(qperfResultsByProject[r['$distinct_id']] || []).length},
           'score': function (r) {return -dsatScore(r['$distinct_id'])},
+          'cluster': function (r) {return -r['$properties']['cluster_id'];},
         }
         
         var projectFilterRegex = new RegExp(projectFilter, "gi");
