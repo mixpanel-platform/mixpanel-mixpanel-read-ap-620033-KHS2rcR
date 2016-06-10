@@ -210,30 +210,34 @@
                 })
                 .reduce(function (accumulators, tuples){
                   var result = {};
-                  for (var a in accumulators) {
-                    for (var k in accumulators[a]) {
-                      result[k] = result[k] || [0,0];
-                      result[k][0] += accumulators[a][k][0];
-                      result[k][1] += accumulators[a][k][1];
-                    }
-                  }
+                  _.each(accumulators, function(a) {
+                    _.each(a, function(dates, project) {
+                      result[project] = result[project] || {};
+                      _.each(dates, function(scores, date) {
+                        result[project][date] = (result[project][date] || [0,0]);
+                        result[project][date][0] += scores[0];
+                        result[project][date][1] += scores[1];
+                      });
+                    });
+                  });
                   for (var t in tuples) {
                     var tup = tuples[t];
-                    var k = new Date(tup.event.time).toISOString().slice(0,10);
+                    var project = tup.event.properties['project id'];
+                    var date = new Date(tup.event.time).toISOString().slice(0,10);
                     var threshold = params.thresholds[tup.event.properties['api name']];
                     var elapsed = tup.event.properties.elapsed / 1000;
                     var tally = tup.user.properties.events_tally * (tup.event.properties.num_days / 31.0);
                     var slow = elapsed > ((threshold.m * tally) + threshold.c) ? 1 : 0;
-                    result[k] = (result[k] || [0,0]);
-                    result[k][slow] += 1;
+                    result[project] = result[project] || {};
+                    result[project][date] = (result[project][date] || [0,0]);
+                    result[project][date][slow] += 1;
                   }
                   return result;
                 })
                 .map(function(r) {
-                  _.each(r, function(v, k){
-                    r[k] = v[1] / (v[0] + v[1]); 
+                  return _.mapObject(r, function(counts, date){
+                    return counts[1] / (counts[0] + counts[1]); 
                   });
-                  return r;
                 });
             };
       };
@@ -467,7 +471,7 @@
           to_date:to_date.toISOString().slice(0,10),
           types: types,
           thresholds: thresholds,
-          project_id: currentProject,
+          //project_id: currentProject,
         }).done( function(results) {
           console.log(results);
           
