@@ -32,7 +32,7 @@
     </ul>
     
     <div id="customers"></div>
-    
+    <div id="score-history"></div>
     <div id="tooltip">
       <ul>
           <li><span id="tt-name"></span></li>
@@ -164,6 +164,7 @@
         projectFilter = event.target.value;
         updateCustomerGrid(event.target.innerText);
       });
+      $('#score-history').MPChart({chartType: 'line');
       
       function getQperfJQL() {
         return function main() {
