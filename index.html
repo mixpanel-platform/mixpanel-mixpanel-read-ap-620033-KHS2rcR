@@ -123,7 +123,8 @@
       };
       var types = _.keys(thresholds).sort();
       var typeFilter = types.slice(0);
-      var color = d3.scale.ordinal().domain(types).range(["#8dd3c7","#bebada","#fb8072","#80b1d3","#fdb462","#b3de69","#fccde5"]);
+      var color = d3.scale.ordinal().domain(types).range(["#8dd3c7","#bebada","#fb8072",
+                                                          "#80b1d3","#fdb462","#b3de69","#fccde5"]);
       var qperfResults = []; // the results of all the queries.
       var qperfResultsByProject = {};
       var topProjects = []; // the people data for the top N projects
@@ -164,7 +165,7 @@
         projectFilter = event.target.value;
         updateCustomerGrid(event.target.innerText);
       });
-      $('#score-history').MPChart({chartType: 'line'});
+      $('#score-history').MPChart({chartType: 'line', highchartsOptions: {yAxis: {min: 0, max: 1}}});
       
       function getQperfJQL() {
         return function main() {
@@ -180,11 +181,11 @@
                   //&& tup.event.properties.to_date != undefined
                   && (params.project_id == undefined || tup.event.properties['project id'] == params.project_id)
                   && params.types.indexOf(tup.event.properties['api name']) != -1
-                  && Math.random() < 0.001; //sampling for debug
+                  && Math.random() < 0.1; //sampling for debug
                 })
                 .map(function (tup){
                   var threshold = params.thresholds[tup.event.properties['api name']];
-                  var elapsed = tup.event.properties.elapsed / 1000;
+                  var elapsed = (tup.event.properties.elapsed / 1000);
                   var num_days = tup.event.properties.num_days;
                   //var num_days = Math.max(1, (new Date(tup.event.properties.to_date) - new Date(tup.event.properties.from_date)) / 86400000);
                   var tally = tup.user.properties.events_tally * (num_days / 31.0);
@@ -256,7 +257,6 @@
           
         query_times.append("g")
             .attr("class", "y axis")
-
           .append("text")
             .attr("class", "label")
             .attr("transform", "rotate(-90)")
