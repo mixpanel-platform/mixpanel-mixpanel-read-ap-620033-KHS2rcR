@@ -179,7 +179,7 @@
                   //&& tup.event.properties.to_date != undefined
                   && (params.project_id == undefined || tup.event.properties['project id'] == params.project_id)
                   && params.types.indexOf(tup.event.properties['api name']) != -1
-                  && Math.random() < 0.5; //sampling for debug
+                  && Math.random() < 0.1; //sampling for debug
                 })
                 .map(function (tup){
                   var threshold = params.thresholds[tup.event.properties['api name']];
