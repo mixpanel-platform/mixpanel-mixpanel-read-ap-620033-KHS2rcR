@@ -126,7 +126,7 @@
         'retention': {m: 2e-8, c: 1.0},
         'events': {m: 0, c: 1.02},
         'timeout': {m: 0, c: 120.0},
-        //'engage': {m: 0, c: 1.00},
+        'engage': {m: 0, c: 1.00},
       };
       var types = _.keys(thresholds).sort();
       var typeFilter = types.slice(0);
@@ -185,18 +185,21 @@
                   return tup.event != undefined
                   && tup.user != undefined
                   && tup.user.properties.rank <= 200
-                  && tup.event.properties.num_days != undefined
+                  //&& tup.event.properties.num_days != undefined
                   //&& tup.event.properties.from_date != undefined
                   //&& tup.event.properties.to_date != undefined
                   && (params.project_id == undefined || tup.event.properties['project id'] == params.project_id)
                   && params.types.indexOf(tup.event.properties['api name']) != -1
-                  && Math.random() < 0.5; //sampling for debug
+                  && Math.random() < 0.1; //sampling for debug
                 })
                 .map(function (tup){
                   var threshold = params.thresholds[tup.event.properties['api name']];
                   var elapsed = parseFloat((tup.event.properties.elapsed / 1000).toFixed(3));
-                  var num_days = tup.event.properties.num_days;
-                  var tally = parseInt((tup.user.properties.events_tally * (num_days / 31.0)).toFixed(0));
+                  if (tup.event.properties['api name'] == 'engage') {
+                    var tally = tup.user.properties.people_tally;
+                  } else {
+                    var tally = parseInt((tup.user.properties.events_tally * (tup.event.properties.num_days / 31.0)).toFixed(0));
+                  }
                   var type_index = params.types.indexOf(tup.event.properties['api name']);
                   var slow = elapsed > ((threshold.m * tally) + threshold.c) ? 1 : 0;
                   return [
@@ -205,7 +208,6 @@
                     type_index, 
                     slow, 
                     tup.event.properties['project id'],
-                    num_days, 
                     tup.user.properties['cluster_id']
                   ];
                 });
@@ -553,8 +555,8 @@
             return memo;
           }, {});
           qperfResultsByCluster = _.reduce(results, function (memo, result) {
-            memo[result[6]] = memo[result[6]] || [];
-            memo[result[6]].push(result); 
+            memo[result[5]] = memo[result[5]] || [];
+            memo[result[5]].push(result); 
             return memo;
           }, {});
           updateQperfScatter();
