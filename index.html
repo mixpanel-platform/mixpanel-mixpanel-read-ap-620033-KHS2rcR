@@ -220,7 +220,7 @@
                   return tup.event != undefined
                   && tup.user != undefined
                   && tup.user.properties.rank <= 200
-                  && tup.event.properties.num_days != undefined
+                  //&& tup.event.properties.num_days != undefined
                   && (params.project_id == undefined || tup.event.properties['project id'] == params.project_id)
                   && params.types.indexOf(tup.event.properties['api name']) != -1
                 })
