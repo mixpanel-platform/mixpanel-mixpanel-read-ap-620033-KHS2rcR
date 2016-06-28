@@ -223,6 +223,7 @@
                   //&& tup.event.properties.num_days != undefined
                   && (params.project_id == undefined || tup.event.properties['project id'] == params.project_id)
                   && params.types.indexOf(tup.event.properties['api name']) != -1
+                  && Math.random() < 0.1;
                 })
                 .reduce(function (accumulators, tuples){
                   var result = {};
