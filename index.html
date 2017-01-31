@@ -165,12 +165,12 @@
       });
       $('#sorts li a').on('click', function(event) { 
         event.preventDefault();
-        updateCustomerGrid(event.target.innerText);
+        updateCustomerGrid(event.target.innerText, event.target.innerText == 'cluster' ? 'cluster' : 'all');
       });
       
       $('#filter').on('input', function (event) {
         projectFilter = event.target.value;
-        updateCustomerGrid(event.target.innerText);
+        updateCustomerGrid(event.target.innerText, event.target.innerText == 'cluster' ? 'cluster' : 'all');
       });
       $('#score-history').MPChart({chartType: 'line', highchartsOptions: {yAxis: {min: 0, max: 1}}});
       
@@ -401,8 +401,9 @@
         return counts.length == 0 ? -1 : _.filter(counts, function (q) {return q[3] == 1;}).length / counts.length;
       }
         
-      function updateCustomerGrid(sort) {
+      function updateCustomerGrid(sort, group) {
         sort = sort || 'rank';
+        group = group || 'all';
         var sorts = {
           'rank': function (r) {return r['$properties']['rank'];},
           'name': function (r) {return r['$properties']['$name'];},
@@ -410,7 +411,11 @@
           'events': function (r) {return -r['$properties']['events_tally'];},
           'queries': function (r) {return -(qperfResultsByProject[r['$distinct_id']] || []).length},
           'score': function (r) {return -dsatScore(r['$distinct_id'])},
-          'cluster': function (r) {return -r['$properties']['cluster_id'];},
+          'cluster': function (r) {return r['$properties']['cluster_id'];},
+        }
+        var groups = {
+          'all': function (r) {return 'all'},
+          'cluster': function (r) {return r['$properties']['cluster_id'];},
         }
         
         var projectFilterRegex = new RegExp(projectFilter, "gi");
@@ -420,11 +425,22 @@
             || projectFilterRegex.test(d['$distinct_id'] + "");
         });
         data = _.sortBy(data, sorts[sort]);
+        data_grouped = _.groupBy(data, groups[group]);
         
         var box = [60, 20];
         var cols = Math.floor((width + margin.left + margin.right) / box[0]);
-        var rows = Math.ceil(data.length / cols);
+        var rows = Math.ceil(data.length / cols) + data_grouped.length;
         d3.select("#customers svg").attr('height', rows * box[1] + margin.top + margin.bottom);
+        
+        var group_y_offset = 0;
+        for(dg in data_grouped) {
+          console.log(dg);
+          for (di in data_grouped[dg]) {
+            data_grouped[dg][di]['group_index'] = di;
+            data_grouped[dg][di]['group_y_offset'] = group_y_offset;
+          }
+          group_y_offset += (Math.ceil(data_grouped[dg].length / cols) + 1) * box[1];
+        }
         
         var tiles = d3.select("#customers svg g").selectAll(".customer")
           .data(data, function (d) {return d['$distinct_id'];});
@@ -452,7 +468,7 @@
           
         // Enter + Update
         tiles.transition().attr("transform", function (d,i){
-          return trans((i % cols) * box[0], Math.floor(i / cols) * box[1]);
+          return trans((d['group_index'] % cols) * box[0], d['group_y_offset'] + Math.floor(d['group_index'] / cols) * box[1]);
         });
         tiles.select("rect").style("fill", function (d) { return greenToRed(dsatScore(d['$distinct_id']));});
         tiles.exit().remove();
